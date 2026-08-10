@@ -683,6 +683,80 @@ body.is-patching .port-in {
   color: var(--c-ink-muted);
 }
 
+/* The tank is clickable — fish open their own window. */
+.app-stage:has(.tank-canvas) {
+  cursor: pointer;
+}
+
+/* ---- fish profile -------------------------------------------------------- */
+
+.profile {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--window-pad) / 2);
+  height: 100%;
+  padding: var(--window-pad);
+  overflow: auto;
+}
+
+.profile-model {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  height: 96px;
+  background: var(--c-boot-bg);
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.fish3d {
+  display: block;
+  /* Nearest-neighbour on the way up — the chunky pixels are the point. */
+  image-rendering: pixelated;
+}
+
+.profile-name {
+  font-family: var(--font-display);
+  font-size: calc(var(--size-ui) * 1.5);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-ui);
+}
+
+.profile-species {
+  margin-top: -0.3em;
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.profile-rows {
+  display: grid;
+  grid-template-columns: 5.5em 1fr;
+  gap: 2px var(--window-pad);
+  margin: 0;
+  font-size: var(--size-small);
+}
+
+.profile-rows dt {
+  color: var(--c-ink-muted);
+}
+
+.profile-rows dd {
+  margin: 0;
+}
+
+.profile-quote {
+  padding: calc(var(--window-pad) / 2);
+  margin: 0;
+  font-style: italic;
+  background: var(--c-surface-alt);
+  border-left: 3px solid var(--c-accent);
+}
+
+.profile-credit {
+  margin-top: auto;
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
 /* ---- weather ------------------------------------------------------------- */
 
 .weather {

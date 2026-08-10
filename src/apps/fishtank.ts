@@ -13,6 +13,8 @@ import type { AppDef } from "./types.ts";
 import type { Agent, Influence } from "../core/influence.ts";
 import { appShell, button } from "./controls.ts";
 import { personName } from "../gen/places.ts";
+import { generateLore, loreWords, type FishLore } from "../gen/fishlore.ts";
+import { mountFish3d } from "./fish3d.ts";
 
 const SPECIES_HEAD = `Golden Spotted Ribbon Paper Glass Blue Banded Dwarf Royal
   Common Lesser Marbled Ghost Velvet Copper Whiptail Fantail Moon`.trim().split(/\s+/);
@@ -28,6 +30,8 @@ interface Fish {
   size: number; hue: number;
   name: string; species: string;
   dead: boolean;
+  /** Residents have a history. Visitors from other programs do not. */
+  lore?: FishLore;
   /** Foreign agents drawn as guests rather than residents. */
   guest?: Agent;
 }
@@ -62,6 +66,7 @@ export const fishTankApp: AppDef = {
       name: rng.pick(PET_NAMES),
       species: `${rng.pick(SPECIES_HEAD)} ${rng.pick(SPECIES_TAIL)}`,
       dead: i === 0,
+      lore: generateLore(rng, i === 0),
     }));
 
     let guests: Fish[] = [];
@@ -84,6 +89,51 @@ export const fishTankApp: AppDef = {
       }),
       caption,
     );
+
+    // Click a fish to read about it. Tracked so a second click on the same fish
+    // focuses nothing new rather than stacking duplicate windows.
+    const openProfiles = new Set<Fish>();
+
+    stage.addEventListener("click", (event: MouseEvent) => {
+      const rect = stage.getBoundingClientRect();
+      const px = (event.clientX - rect.left) / rect.width;
+      const py = (event.clientY - rect.top) / rect.height;
+
+      let best: Fish | null = null;
+      let bestDistance = Infinity;
+      for (const f of residents) {
+        // Compare in stage space, correcting x for aspect so the hit area is
+        // round on screen rather than an ellipse.
+        const dx = (f.x - px) * (rect.width / rect.height);
+        const dy = f.y - py;
+        const distance = Math.hypot(dx, dy);
+        if (distance < f.size * 1.6 && distance < bestDistance) {
+          best = f;
+          bestDistance = distance;
+        }
+      }
+
+      if (!best || openProfiles.has(best)) return;
+      openProfile(best);
+    });
+
+    function openProfile(fish: Fish): void {
+      if (!fish.lore) return;
+      openProfiles.add(fish);
+
+      const { body, dispose } = buildProfile(fish, fish.lore);
+      ctx.openWindow({
+        title: fish.name,
+        body,
+        width: 300,
+        height: 340,
+        resizable: false,
+        onClose: () => {
+          dispose();
+          openProfiles.delete(fish);
+        },
+      });
+    }
 
     let frame = 0;
 
@@ -171,6 +221,9 @@ export const fishTankApp: AppDef = {
             words: [
               ...residents.map((f) => f.name),
               ...residents.map((f) => f.species.toLowerCase()),
+              // What the fish are fond of travels too, so a shop plugged into
+              // the tank starts stocking it.
+              ...residents.flatMap((f) => (f.lore ? loreWords(f.lore) : [])),
             ],
             palette: residents.map((f) => f.hue),
             // Depths ride in rhythm, which the change-signature ignores — so
@@ -211,6 +264,52 @@ export const fishTankApp: AppDef = {
     };
   },
 };
+
+/** The profile window's contents, plus a teardown for its animation loop. */
+function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose: () => void } {
+  const root = document.createElement("div");
+  root.className = "profile";
+
+  const stage = document.createElement("div");
+  stage.className = "profile-model";
+  const model = mountFish3d(stage, { hue: fish.hue, deceased: fish.dead });
+
+  const name = document.createElement("div");
+  name.className = "profile-name";
+  name.textContent = fish.name;
+
+  const species = document.createElement("div");
+  species.className = "profile-species";
+  species.textContent = lore.deceased
+    ? `${fish.species} · deceased`
+    : `${fish.species} · ${lore.temperament}`;
+
+  const rows = document.createElement("dl");
+  rows.className = "profile-rows";
+  const row = (label: string, value: string) => {
+    const dt = document.createElement("dt");
+    dt.textContent = label;
+    const dd = document.createElement("dd");
+    dd.textContent = value;
+    rows.append(dt, dd);
+  };
+
+  row("Age", lore.age);
+  row("Likes", lore.likes.join(", "));
+  row("Dislikes", lore.dislikes.join(", "));
+  row("From", lore.acquired);
+
+  const quote = document.createElement("blockquote");
+  quote.className = "profile-quote";
+  quote.textContent = lore.quote;
+
+  const credit = document.createElement("div");
+  credit.className = "profile-credit";
+  credit.textContent = `Recorded by ${lore.recordedBy}`;
+
+  root.append(stage, name, species, rows, quote, credit);
+  return { body: root, dispose: () => model.stop() };
+}
 
 function drawCreature(
   c: CanvasRenderingContext2D,

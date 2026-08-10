@@ -83,6 +83,17 @@ export class Workspace {
       vfs: this.vfs,
       changed: () => this.graph.touch(),
       incoming: () => this.graph.incoming(id),
+      openWindow: (spec) => {
+        const child = this.wm.open({
+          title: spec.title,
+          body: spec.body,
+          ...(spec.width !== undefined ? { width: spec.width } : {}),
+          ...(spec.height !== undefined ? { height: spec.height } : {}),
+          ...(spec.resizable !== undefined ? { resizable: spec.resizable } : {}),
+          ...(spec.onClose ? { onClose: spec.onClose } : {}),
+        });
+        return { close: () => this.wm.close(child) };
+      },
     });
 
     this.graph.add(instance.node);

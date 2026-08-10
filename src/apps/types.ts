@@ -12,6 +12,19 @@ import type { Influence } from "../core/influence.ts";
 import type { Rng } from "../core/rng.ts";
 import type { Vfs } from "../fs/vfs.ts";
 
+export interface ChildWindowSpec {
+  title: string;
+  body: HTMLElement;
+  width?: number;
+  height?: number;
+  resizable?: boolean;
+  onClose?: () => void;
+}
+
+export interface ChildWindow {
+  close(): void;
+}
+
 export interface AppContext {
   id: string;
   title: string;
@@ -21,6 +34,14 @@ export interface AppContext {
   changed(): void;
   /** Merged influence currently arriving. Cheap — safe to poll per frame. */
   incoming(): Influence;
+  /**
+   * Open a plain window that is not a program — an inspector, a detail panel.
+   *
+   * A child window has no ports and no presence on the bus. This keeps apps
+   * ignorant of the window manager while still letting them do the thing every
+   * real OS does: click a thing, get a window about that thing.
+   */
+  openWindow(spec: ChildWindowSpec): ChildWindow;
 }
 
 export interface AppInstance {
