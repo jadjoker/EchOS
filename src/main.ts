@@ -11,7 +11,9 @@ import { WindowManager } from "./wm/manager.ts";
 import { createAbout } from "./shell/about.ts";
 import { Workspace } from "./workspace.ts";
 import { Economy } from "./core/economy.ts";
+import { Collection } from "./core/collection.ts";
 import { createWallet } from "./shell/wallet.ts";
+import { shopApp } from "./apps/shop.ts";
 import { createDesktopIcons, type IconSpec } from "./desktop/icons.ts";
 import { browserApp } from "./apps/browser.ts";
 import { fishTankApp } from "./apps/fishtank.ts";
@@ -63,11 +65,14 @@ async function main(): Promise<void> {
   economy.start();
   wm.setTray(createWallet(economy));
 
-  const workspace = new Workspace(screen, wm, rng, vfs, economy);
+  // Coins and the collection outlive the machine; everything else is thrown
+  // away on the next boot.
+  const collection = new Collection();
+  const workspace = new Workspace(screen, wm, rng, vfs, economy, collection);
 
   // Nothing opens on boot. An empty desktop you have to explore reads as a
   // machine somebody left behind; a pre-arranged set of windows reads as a demo.
-  const programs = [browserApp, fishTankApp, weatherApp, filesApp];
+  const programs = [browserApp, fishTankApp, shopApp, weatherApp, filesApp];
   const icons: IconSpec[] = programs.map((def) => ({
     id: def.id,
     label: def.title,

@@ -8,7 +8,8 @@
  */
 
 import type { InfluenceNode } from "../core/graph.ts";
-import type { ActivityKind } from "../core/economy.ts";
+import type { ActivityKind, Economy } from "../core/economy.ts";
+import type { Collection } from "../core/collection.ts";
 import type { Influence } from "../core/influence.ts";
 import type { Rng } from "../core/rng.ts";
 import type { Vfs } from "../fs/vfs.ts";
@@ -50,6 +51,10 @@ export interface AppContext {
    * an app cannot accidentally make itself the most profitable thing to spam.
    */
   nudge(kind: ActivityKind): void;
+  /** Coins. Shared by every program — there is one wallet, not one per app. */
+  economy: Economy;
+  /** What the player owns, carried between machines. */
+  collection: Collection;
 }
 
 export interface AppInstance {

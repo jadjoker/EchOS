@@ -14,6 +14,7 @@
 import { Graph } from "./core/graph.ts";
 import { describeInfluence } from "./core/influence.ts";
 import type { Economy } from "./core/economy.ts";
+import type { Collection } from "./core/collection.ts";
 import type { Rng } from "./core/rng.ts";
 import type { Vfs } from "./fs/vfs.ts";
 import type { AppDef } from "./apps/types.ts";
@@ -44,6 +45,7 @@ export class Workspace {
     private readonly rng: Rng,
     private readonly vfs: Vfs,
     private readonly economy: Economy,
+    private readonly collection: Collection,
   ) {
     this.svg = document.createElementNS(SVG_NS, "svg");
     this.svg.setAttribute("class", "cable-layer");
@@ -97,6 +99,8 @@ export class Workspace {
         return { close: () => this.wm.close(child) };
       },
       nudge: (kind) => this.economy.nudge(kind),
+      economy: this.economy,
+      collection: this.collection,
     });
 
     this.graph.add(instance.node);

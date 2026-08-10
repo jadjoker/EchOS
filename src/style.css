@@ -745,6 +745,84 @@ body.is-patching .port-in {
   cursor: pointer;
 }
 
+/* ---- shop ---------------------------------------------------------------- */
+
+.shop-balance {
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+}
+
+.shop-list {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: calc(var(--window-pad) / 2);
+  overflow: auto;
+}
+
+.shop-section {
+  padding: var(--window-pad) calc(var(--window-pad) / 2) 2px;
+  font-size: var(--size-small);
+  font-weight: var(--weight-strong);
+  text-transform: var(--title-transform);
+  color: var(--c-ink-muted);
+}
+
+.shop-item {
+  display: flex;
+  gap: var(--window-pad);
+  align-items: center;
+  padding: calc(var(--window-pad) / 2);
+  border-bottom: var(--border-width) var(--border-style) var(--c-surface-alt);
+}
+
+.shop-item.is-sold,
+.shop-item.is-owned {
+  opacity: 0.5;
+}
+
+.shop-item-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.shop-item-title {
+  font-size: var(--size-ui);
+}
+
+.shop-item-detail {
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.shop-buy {
+  flex: 0 0 auto;
+  min-width: 4.5em;
+  height: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.shop-buy:disabled {
+  background: var(--c-surface-alt);
+  color: var(--c-ink-muted);
+  cursor: default;
+}
+
+.shop-notice {
+  padding: var(--window-pad) calc(var(--window-pad) / 2);
+  margin-top: auto;
+  font-size: var(--size-small);
+  font-style: italic;
+  color: var(--c-ink-muted);
+}
+
 /* ---- fish profile -------------------------------------------------------- */
 
 .profile {

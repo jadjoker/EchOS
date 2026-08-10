@@ -32,6 +32,8 @@ interface Fish {
   dead: boolean;
   /** Residents have a history. Visitors from other programs do not. */
   lore?: FishLore;
+  /** Bought, and therefore carried to the next machine. */
+  mine?: boolean;
   /** Foreign agents drawn as guests rather than residents. */
   guest?: Agent;
 }
@@ -69,23 +71,55 @@ export const fishTankApp: AppDef = {
       lore: generateLore(rng, i === 0),
     }));
 
+    // Your fish join the machine's own. The previous owner's fish and yours
+    // sharing a tank is the whole premise in one window: the computer is
+    // borrowed, the collection is not.
+    const owned: Fish[] = ctx.collection.fish
+      .slice(0, ctx.collection.capacity)
+      .map((f) => ({
+        x: rng.range(0.1, 0.9), y: rng.range(0.15, 0.85),
+        vx: rng.range(-0.0016, 0.0016) || 0.0012,
+        vy: rng.range(-0.0006, 0.0006),
+        size: f.size, hue: f.hue,
+        name: f.name, species: f.species,
+        dead: false, lore: f.lore, mine: true,
+      }));
+    residents.push(...owned);
+
     let guests: Fish[] = [];
     let arriving: Influence | null = null;
     const keeper = personName(rng);
 
+    /** Flakes drifting down after a feed. */
+    const flakes: { x: number; y: number; vy: number }[] = [];
+
     function updateCaption(): void {
       const extra = guests.length ? ` · ${guests.length} visitors` : "";
-      caption.textContent = `${count} fish${extra} · kept by ${keeper}`;
+      const yours = owned.length ? ` · ${owned.length} yours` : "";
+      const tin = ctx.collection.food > 0 ? ` · ${ctx.collection.food} feeds` : "";
+      // Total, not the machine's own count — "8 fish · 2 yours" otherwise reads
+      // as two of the eight rather than two on top of them.
+      const total = count + owned.length;
+      caption.textContent = `${total} fish${yours}${extra} · kept by ${keeper}${tin}`;
     }
     updateCaption();
 
     controls.append(
       button("Feed", () => {
+        // Flake is optional. Tapping the glass still works when the tin is
+        // empty — gating a free interaction behind a purchase would make the
+        // shop feel like a tollbooth.
+        if (ctx.collection.useFood()) {
+          for (let i = 0; i < 14; i++) {
+            flakes.push({ x: rng.range(0.15, 0.85), y: -0.02, vy: rng.range(0.0012, 0.0032) });
+          }
+        }
         for (const f of residents) {
           if (f.dead) continue;
           f.vy -= rng.range(0.001, 0.003);
           f.vx += rng.range(-0.002, 0.002);
         }
+        updateCaption();
         ctx.nudge("tinker");
       }),
       caption,
@@ -154,9 +188,12 @@ export const fishTankApp: AppDef = {
       if (!c) return;
 
       const live = ctx.incoming();
-      // Cold water slows everything and drains the colour out of it.
+      // Cold water slows everything and drains the colour out of it. A heater
+      // is what the upgrade is for — it does not warm the tank so much as stop
+      // the weather from reaching it.
       const temperature = live.scalars["temperature"] ?? 14;
-      const chill = Math.max(0, Math.min(1, (12 - temperature) / 22));
+      const rawChill = Math.max(0, Math.min(1, (12 - temperature) / 22));
+      const chill = ctx.collection.has("heater") ? rawChill * 0.15 : rawChill;
       const agitation = live.rhythm.length
         ? Math.abs(live.rhythm[Math.floor(time / 60) % live.rhythm.length] ?? 0)
         : 0;
@@ -174,8 +211,29 @@ export const fishTankApp: AppDef = {
         c.fillRect(0, 0, w, h);
       }
 
+      // A hood lamp lifts everything; without one the tank is a bit murky.
+      if (ctx.collection.has("lamp")) {
+        const glow = c.createLinearGradient(0, 0, 0, h);
+        glow.addColorStop(0, "rgb(255 250 220 / 0.22)");
+        glow.addColorStop(1, "rgb(255 250 220 / 0)");
+        c.fillStyle = glow;
+        c.fillRect(0, 0, w, h);
+      }
+
       c.fillStyle = token("--c-surface-alt") || "#333";
       c.fillRect(0, h * 0.9, w, h * 0.1);
+
+      if (ctx.collection.has("castle")) drawCastle(c, w, h, token("--c-surface") || "#888");
+
+      // Flakes sink, and are eaten when they reach the gravel.
+      c.fillStyle = "#c9a227";
+      for (let i = flakes.length - 1; i >= 0; i--) {
+        const flake = flakes[i]!;
+        flake.y += flake.vy;
+        flake.x += Math.sin(time / 700 + flake.y * 20) * 0.0006;
+        if (flake.y > 0.9) { flakes.splice(i, 1); continue; }
+        c.fillRect(flake.x * w, flake.y * h, Math.max(1, w * 0.005), Math.max(1, h * 0.008));
+      }
 
       const speed = (1 - chill * 0.7) * (1 + agitation * 1.6);
 
@@ -267,6 +325,32 @@ export const fishTankApp: AppDef = {
   },
 };
 
+/**
+ * The ceramic castle. Hollow, which is the point — one of the generated fish
+ * quotes is "It is not a castle. I have been inside it.", and the ornament
+ * existing makes that line land instead of floating free.
+ */
+function drawCastle(c: CanvasRenderingContext2D, w: number, h: number, colour: string): void {
+  const base = h * 0.9;
+  const width = Math.min(w * 0.16, h * 0.3);
+  const height = width * 1.1;
+  const x = w * 0.78;
+
+  c.fillStyle = colour;
+  c.fillRect(x - width / 2, base - height, width, height);
+  // Crenellations.
+  const merlon = width / 5;
+  for (let i = 0; i < 3; i++) {
+    c.fillRect(x - width / 2 + i * merlon * 2, base - height - merlon, merlon, merlon);
+  }
+  // The doorway everyone keeps going into.
+  c.fillStyle = "rgb(0 0 0 / 0.55)";
+  c.beginPath();
+  c.arc(x, base - height * 0.28, width * 0.16, Math.PI, 0);
+  c.fillRect(x - width * 0.16, base - height * 0.28, width * 0.32, height * 0.28);
+  c.fill();
+}
+
 /** The profile window's contents, plus a teardown for its animation loop. */
 function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose: () => void } {
   const root = document.createElement("div");
@@ -284,7 +368,9 @@ function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose:
   species.className = "profile-species";
   species.textContent = lore.deceased
     ? `${fish.species} · deceased`
-    : `${fish.species} · ${lore.temperament}`;
+    : fish.mine
+      ? `${fish.species} · ${lore.temperament} · yours`
+      : `${fish.species} · ${lore.temperament}`;
 
   const rows = document.createElement("dl");
   rows.className = "profile-rows";
