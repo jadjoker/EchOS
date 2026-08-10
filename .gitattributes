@@ -1,0 +1,6 @@
+# Normalise line endings in the repository to LF.
+#
+# Without this, checking the project out on Linux (a Steam Deck, a CI runner)
+# shows every file as modified, because Windows checkouts write CRLF. Git still
+# hands you CRLF locally where the platform wants it.
+* text=auto eol=lf

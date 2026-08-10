@@ -1,0 +1,1184 @@
+/*
+ * Shell styling. Reads tokens only — no literal colours, radii, fonts or
+ * durations below this line. See theme/tokens.css for why that rule exists.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+  line-height: var(--leading-ui);
+  letter-spacing: var(--tracking-ui);
+  color: var(--c-ink);
+  background: var(--c-boot-bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* `select` and `option` must be listed explicitly. They do NOT inherit colour
+   from body the way button/input do, so omitting them leaves the browser's
+   default black text sitting on a generated dark field — invisible on roughly
+   half the themes. The contrast floor cannot catch this: it is an inheritance
+   gap, not a palette fault. */
+button,
+input,
+select,
+textarea,
+optgroup,
+option {
+  font: inherit;
+  letter-spacing: inherit;
+  color: var(--c-ink);
+}
+
+option,
+optgroup {
+  /* The native dropdown list renders outside the page's stacking context and
+     takes no styling from the closed control, so it needs its own background. */
+  background: var(--c-field);
+}
+
+#screen {
+  position: fixed;
+  inset: 0;
+}
+
+/* ---- boot ---------------------------------------------------------------- */
+
+.boot {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 4vh 4vw calc(4vh + 1.5em);
+  background: var(--c-boot-bg);
+  color: var(--c-boot-ink);
+  font-family: var(--font-boot);
+  font-size: var(--size-boot);
+  opacity: 1;
+  transition: opacity var(--motion-slow) var(--ease-ui);
+}
+
+.boot.is-leaving {
+  opacity: 0;
+}
+
+.boot-log {
+  margin: 0;
+  overflow: hidden;
+  font: inherit;
+  white-space: pre-wrap;
+}
+
+.boot-line[data-tone="ok"] {
+  color: var(--c-boot-ok);
+}
+.boot-line[data-tone="warn"] {
+  color: var(--c-boot-warn);
+}
+.boot-line[data-tone="fail"] {
+  color: var(--c-boot-fail);
+}
+.boot-line[data-tone="dim"] {
+  color: var(--c-boot-dim);
+}
+
+.boot-hint {
+  position: absolute;
+  right: 4vw;
+  bottom: 3vh;
+  color: var(--c-boot-dim);
+  font-size: var(--size-small);
+}
+
+/* ---- desktop ------------------------------------------------------------- */
+
+.desktop {
+  position: absolute;
+  inset: 0 0 var(--taskbar-height) 0;
+  /* Split rather than shorthand: --texture-desktop may be a generated tile
+     url() that needs a colour behind it, or a gradient that doesn't. */
+  background-color: var(--c-desktop);
+  background-image: var(--texture-desktop);
+  background-repeat: repeat;
+}
+
+/* ---- desktop icons ------------------------------------------------------- */
+
+.icons {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: calc(var(--window-pad) / 2);
+  padding: var(--window-pad);
+  max-height: 100%;
+}
+
+.icon {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+  width: 88px;
+  padding: 4px;
+  background: transparent;
+  border: var(--border-width) dotted transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.icon-face {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  background-repeat: repeat;
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-control);
+}
+
+.icon-glyph {
+  font-size: 22px;
+  line-height: 1;
+  /* The generated tile behind can be any colour; a halo keeps the glyph
+     readable without needing to know what it landed on. */
+  text-shadow: 0 0 3px var(--c-surface), 0 0 6px var(--c-surface);
+}
+
+.icon-label {
+  max-width: 100%;
+  padding: 0 3px;
+  overflow: hidden;
+  font-size: var(--size-small);
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Sits on generated wallpaper, so it carries its own contrast-checked pair
+     rather than trusting whatever the desktop rolled. */
+  color: var(--c-ink);
+  background: var(--c-surface);
+  border-radius: 2px;
+}
+
+.icon:hover .icon-label {
+  background: var(--c-surface-alt);
+}
+
+.icon.is-selected {
+  border-color: var(--c-accent-ink);
+}
+
+.icon.is-selected .icon-label {
+  color: var(--c-accent-ink);
+  background: var(--c-accent);
+}
+
+.window-layer {
+  position: absolute;
+  inset: 0 0 var(--taskbar-height) 0;
+  /* The layer is a coordinate space, not a click target — only windows in it
+     should intercept pointer events, so the desktop stays clickable. */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+/* ---- window -------------------------------------------------------------- */
+
+.win {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+  background: var(--c-surface);
+  background-image: var(--texture-surface);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-window);
+  box-shadow: var(--shadow-window-blur);
+  transition: box-shadow var(--motion-fast) var(--ease-ui);
+}
+
+.win.is-focused {
+  box-shadow: var(--shadow-window);
+}
+
+.win.is-minimized {
+  display: none;
+}
+
+/* Suppress transitions mid-gesture so dragging never lags the pointer. */
+.win.is-dragging,
+.win.is-resizing {
+  transition: none;
+  user-select: none;
+}
+
+.win-titlebar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--window-pad);
+  height: var(--titlebar-height);
+  padding: 0 var(--window-pad);
+  background: var(--c-title-blur);
+  background-image: var(--texture-title);
+  color: var(--c-title-ink-blur);
+  border-radius: calc(var(--radius-window) - var(--border-width))
+    calc(var(--radius-window) - var(--border-width)) 0 0;
+  cursor: default;
+  touch-action: none;
+}
+
+.win.is-focused .win-titlebar {
+  background: var(--c-title);
+  color: var(--c-title-ink);
+}
+
+.win-title {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font-weight: var(--weight-strong);
+  font-size: var(--size-small);
+  text-transform: var(--title-transform);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.win-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: calc(var(--window-pad) / 2);
+}
+
+.win-control {
+  display: grid;
+  place-items: center;
+  width: calc(var(--titlebar-height) - 10px);
+  height: calc(var(--titlebar-height) - 10px);
+  padding: 0;
+  font-size: var(--size-small);
+  line-height: 1;
+  background: transparent;
+  color: inherit;
+  border: var(--border-width) var(--border-style) transparent;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.win-control:hover {
+  border-color: currentColor;
+}
+
+.win-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--c-surface);
+}
+
+/* ---- resize grips -------------------------------------------------------- */
+
+.win-grip {
+  position: absolute;
+  touch-action: none;
+}
+
+.win-grip-n,
+.win-grip-s {
+  left: var(--resize-grip);
+  right: var(--resize-grip);
+  height: var(--resize-grip);
+  cursor: ns-resize;
+}
+.win-grip-n {
+  top: calc(var(--resize-grip) * -0.5);
+}
+.win-grip-s {
+  bottom: calc(var(--resize-grip) * -0.5);
+}
+
+.win-grip-e,
+.win-grip-w {
+  top: var(--resize-grip);
+  bottom: var(--resize-grip);
+  width: var(--resize-grip);
+  cursor: ew-resize;
+}
+.win-grip-e {
+  right: calc(var(--resize-grip) * -0.5);
+}
+.win-grip-w {
+  left: calc(var(--resize-grip) * -0.5);
+}
+
+.win-grip-ne,
+.win-grip-nw,
+.win-grip-se,
+.win-grip-sw {
+  width: calc(var(--resize-grip) * 2);
+  height: calc(var(--resize-grip) * 2);
+}
+.win-grip-nw {
+  top: calc(var(--resize-grip) * -0.5);
+  left: calc(var(--resize-grip) * -0.5);
+  cursor: nwse-resize;
+}
+.win-grip-ne {
+  top: calc(var(--resize-grip) * -0.5);
+  right: calc(var(--resize-grip) * -0.5);
+  cursor: nesw-resize;
+}
+.win-grip-sw {
+  bottom: calc(var(--resize-grip) * -0.5);
+  left: calc(var(--resize-grip) * -0.5);
+  cursor: nesw-resize;
+}
+.win-grip-se {
+  right: calc(var(--resize-grip) * -0.5);
+  bottom: calc(var(--resize-grip) * -0.5);
+  cursor: nwse-resize;
+}
+
+/* ---- ports and cables ---------------------------------------------------- */
+
+.cable-layer {
+  position: absolute;
+  inset: 0 0 var(--taskbar-height) 0;
+  /* Above windows so a cable is never hidden behind the thing it connects,
+     but transparent to the pointer except on the strokes themselves. */
+  z-index: 800;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.cable {
+  fill: none;
+  stroke: var(--c-accent);
+  stroke-width: var(--cable-width);
+  stroke-linecap: round;
+  pointer-events: stroke;
+  cursor: pointer;
+  opacity: 0.85;
+}
+
+.cable:hover {
+  stroke: var(--c-boot-fail);
+  stroke-width: calc(var(--cable-width) * 1.8);
+  opacity: 1;
+}
+
+.cable-draft {
+  fill: none;
+  stroke: var(--c-accent);
+  stroke-width: var(--cable-width);
+  stroke-dasharray: 4 4;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.port {
+  position: absolute;
+  width: var(--port-size);
+  height: var(--port-size);
+  background: var(--c-accent);
+  border: var(--border-width) solid var(--c-line);
+  border-radius: var(--radius-control);
+  cursor: crosshair;
+  touch-action: none;
+  transition: transform var(--motion-fast) var(--ease-ui);
+}
+
+.port-in {
+  left: calc(var(--port-size) * -0.5);
+}
+
+.port-out {
+  right: calc(var(--port-size) * -0.5);
+}
+
+.port:hover,
+.port.is-target {
+  transform: scale(1.35);
+}
+
+.port.is-reject {
+  background: var(--c-boot-fail);
+}
+
+.port.is-flash {
+  background: var(--c-boot-ok);
+}
+
+/* While patching, every input port is a target worth seeing. */
+body.is-patching .port-in {
+  transform: scale(1.3);
+  box-shadow: 0 0 0 3px var(--c-accent);
+}
+
+/* ---- taskbar ------------------------------------------------------------- */
+
+.taskbar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  gap: calc(var(--window-pad) / 2);
+  height: var(--taskbar-height);
+  padding: 0 var(--window-pad);
+  background: var(--c-surface-alt);
+  border-top: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.taskbar-item {
+  max-width: 180px;
+  height: var(--control-height);
+  padding: 0 var(--window-pad);
+  overflow: hidden;
+  font-size: var(--size-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: var(--c-surface);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.taskbar-item.is-focused {
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+  border-color: var(--c-accent);
+}
+
+.taskbar-item.is-minimized {
+  color: var(--c-ink-muted);
+  font-style: italic;
+}
+
+/* ---- file browser -------------------------------------------------------- */
+
+.files {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.files-bar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--window-pad);
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  border-bottom: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.files-up {
+  width: var(--control-height);
+  height: var(--control-height);
+  padding: 0;
+  background: var(--c-surface);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
+.files-up:disabled {
+  color: var(--c-ink-muted);
+  cursor: default;
+}
+
+.files-path {
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.files-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--c-field);
+}
+
+.files-row {
+  display: flex;
+  gap: var(--window-pad);
+  align-items: baseline;
+  width: 100%;
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: var(--border-width) var(--border-style) var(--c-surface-alt);
+  cursor: pointer;
+}
+
+.files-row:hover {
+  background: var(--c-surface-alt);
+}
+
+.files-glyph {
+  flex: 0 0 auto;
+  width: 1.2em;
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.files-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.files-row-dir .files-name {
+  font-weight: var(--weight-strong);
+}
+
+.files-meta {
+  flex: 0 0 auto;
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.files-empty {
+  padding: var(--window-pad);
+  color: var(--c-ink-muted);
+  font-style: italic;
+}
+
+.files-status {
+  flex: 0 0 auto;
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+  border-top: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.files-row.is-dragging {
+  opacity: 0.45;
+}
+
+/* ---- apps ---------------------------------------------------------------- */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.app-controls {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: calc(var(--window-pad) / 2);
+  align-items: center;
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  border-bottom: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.app-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--c-field);
+}
+
+.ctl {
+  display: flex;
+  gap: calc(var(--window-pad) / 2);
+  align-items: center;
+  font-size: var(--size-small);
+}
+
+.ctl-label {
+  color: var(--c-ink-muted);
+}
+
+.ctl-readout {
+  min-width: 3.2em;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+}
+
+.ctl-select .ctl-field {
+  height: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  color: var(--c-ink);
+  background: var(--c-field);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+}
+
+.ctl-slider .ctl-field {
+  width: 78px;
+  accent-color: var(--c-accent);
+}
+
+.ctl-button {
+  height: var(--control-height);
+  padding: 0 var(--window-pad);
+  font-size: var(--size-small);
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-control);
+  cursor: pointer;
+}
+
+.ctl-button:hover {
+  background: var(--c-bevel-light);
+}
+
+.scope-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.signal-readout,
+.shaper-status {
+  padding: var(--window-pad);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.signal-readout {
+  font-size: calc(var(--size-ui) * 1.3);
+  color: var(--c-ink);
+}
+
+/* ---- aquarium ------------------------------------------------------------ */
+
+.tank-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tank-caption {
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+/* ---- weather ------------------------------------------------------------- */
+
+.weather {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--window-pad) / 2);
+  height: 100%;
+  padding: var(--window-pad);
+  overflow: auto;
+}
+
+.weather-town {
+  font-family: var(--font-display);
+  font-size: calc(var(--size-ui) * 1.3);
+  font-weight: var(--weight-strong);
+}
+
+.weather-now {
+  font-family: var(--font-mono);
+  color: var(--c-accent);
+}
+
+.weather-chart {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+  align-items: flex-end;
+  height: 54px;
+  padding: 2px;
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.weather-bar {
+  flex: 1 1 auto;
+  background: var(--c-accent);
+}
+
+.weather-forecast {
+  display: flex;
+  flex-direction: column;
+  font-size: var(--size-small);
+}
+
+.weather-row {
+  display: grid;
+  grid-template-columns: 3em 1fr auto;
+  gap: var(--window-pad);
+  padding: 2px 0;
+  border-bottom: var(--border-width) var(--border-style) var(--c-surface-alt);
+}
+
+.weather-temp {
+  font-family: var(--font-mono);
+}
+
+.weather-remark {
+  margin-top: auto;
+  font-size: var(--size-small);
+  font-style: italic;
+  color: var(--c-ink-muted);
+}
+
+/* ---- browser ------------------------------------------------------------- */
+
+.browser {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.browser-bar {
+  display: flex;
+  flex: 0 0 auto;
+  gap: calc(var(--window-pad) / 2);
+  align-items: center;
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  border-bottom: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.browser-nav,
+.browser-go {
+  height: var(--control-height);
+  min-width: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  font-size: var(--size-small);
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-control);
+  cursor: pointer;
+}
+
+.browser-nav:disabled {
+  color: var(--c-ink-muted);
+  cursor: default;
+}
+
+.browser-address {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  background: var(--c-field);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+}
+
+.browser-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.browser-viewport {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  background: var(--c-field);
+}
+
+/* Visitors from other programs drift above the page and never take clicks. */
+.browser-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.browser-status {
+  flex: 0 0 auto;
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+  border-top: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.browser-home {
+  padding: calc(var(--window-pad) * 2);
+}
+
+.browser-home-title {
+  margin: 0 0 0.4em;
+  font-family: var(--font-display);
+  font-size: calc(var(--size-ui) * 1.6);
+}
+
+.browser-home-hint {
+  margin: 0 0 1.4em;
+  color: var(--c-ink-muted);
+}
+
+.browser-home-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--window-pad) / 2);
+}
+
+.browser-home-link {
+  padding: 2px calc(var(--window-pad) / 2);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  color: var(--c-accent);
+  background: var(--c-surface);
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+/* ---- generated sites ----------------------------------------------------- */
+
+.site {
+  min-height: 100%;
+  padding: calc(var(--window-pad) * 2);
+  color: var(--c-ink);
+  font-family: var(--font-ui);
+  font-size: var(--size-ui);
+}
+
+.site-banner {
+  padding: var(--window-pad);
+  margin-bottom: var(--window-pad);
+  text-align: center;
+  color: var(--c-title-ink);
+  background: var(--c-title);
+  background-image: var(--texture-title);
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.site-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: calc(var(--size-ui) * 2);
+  letter-spacing: var(--tracking-ui);
+  text-transform: var(--title-transform);
+}
+
+.site-tagline {
+  margin: 0.3em 0 0;
+  font-size: var(--size-small);
+  opacity: 0.85;
+}
+
+.site-marquee {
+  overflow: hidden;
+  padding: 3px 0;
+  margin-bottom: var(--window-pad);
+  color: var(--c-accent-ink);
+  background: var(--c-accent);
+  white-space: nowrap;
+}
+
+.site-marquee-track {
+  display: inline-flex;
+  /* Two copies, translated by exactly half, so the loop has no gap. */
+  animation: site-marquee 14s linear infinite;
+}
+
+.site-marquee-text,
+.site-marquee-track::after {
+  padding-right: 4em;
+  font-size: var(--size-small);
+  white-space: nowrap;
+}
+
+/* The second copy of the scrolling text. A pseudo-element rather than a node
+   so it never lands in textContent. */
+.site-marquee-track::after {
+  content: var(--marquee-text, "");
+}
+
+@keyframes site-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-marquee-track { animation: none; }
+}
+
+.site-heading {
+  margin: 1.2em 0 0.4em;
+  font-family: var(--font-display);
+  font-size: calc(var(--size-ui) * 1.25);
+  text-transform: var(--title-transform);
+}
+
+.site-para {
+  margin: 0 0 0.8em;
+  max-width: 62ch;
+}
+
+.site-list {
+  margin: 0 0 0.8em;
+  padding-left: 1.4em;
+}
+
+.site-list-item {
+  margin-bottom: 0.25em;
+}
+
+.site-products {
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.site-product {
+  display: flex;
+  gap: var(--window-pad);
+  align-items: baseline;
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  border-bottom: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.site-product:last-child { border-bottom: 0; }
+.site-product:nth-child(odd) { background: var(--c-surface-alt); }
+
+.site-product-name { flex: 1 1 auto; font-weight: var(--weight-strong); }
+.site-product-note { color: var(--c-ink-muted); font-size: var(--size-small); }
+.site-product-price { font-family: var(--font-mono); }
+
+.site-guestbook { margin-top: var(--window-pad); }
+
+.site-guest {
+  padding: calc(var(--window-pad) / 2);
+  margin-bottom: calc(var(--window-pad) / 2);
+  background: var(--c-surface-alt);
+  border-left: 3px solid var(--c-accent);
+}
+
+.site-guest-head {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--window-pad);
+  font-size: var(--size-small);
+}
+
+.site-guest-who { font-weight: var(--weight-strong); color: var(--c-accent); }
+.site-guest-when { color: var(--c-ink-muted); }
+.site-guest-text { margin-top: 2px; }
+
+.site-link {
+  color: var(--c-accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.site-counter {
+  display: flex;
+  gap: calc(var(--window-pad) / 2);
+  align-items: center;
+  justify-content: center;
+  margin-top: calc(var(--window-pad) * 2);
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.site-counter-digits { display: flex; gap: 1px; }
+
+.site-counter-digit {
+  padding: 1px 3px;
+  font-family: var(--font-mono);
+  color: var(--c-boot-ink);
+  background: var(--c-boot-bg);
+}
+
+.site-construction {
+  padding: var(--window-pad) 0;
+  text-align: center;
+}
+
+.site-construction-bar {
+  height: 14px;
+  background-repeat: repeat;
+}
+
+.site-construction-note {
+  padding: var(--window-pad);
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: calc(var(--size-ui) * 1.3);
+}
+
+.site-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: var(--window-pad);
+}
+
+.site-badge {
+  padding: 1px 5px;
+  font-size: calc(var(--size-small) * 0.92);
+  color: var(--c-ink-muted);
+  background: var(--c-surface-alt);
+  border: 1px solid var(--c-line);
+}
+
+.site-rule {
+  height: 0;
+  margin: var(--window-pad) 0;
+  border: 0;
+  border-top: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.site-figure {
+  margin: var(--window-pad) 0;
+}
+
+.site-figure-image {
+  width: min(100%, 260px);
+  height: 130px;
+  background-repeat: repeat;
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.site-figure-caption {
+  margin-top: 3px;
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.site-contact {
+  padding: var(--window-pad);
+  margin-top: var(--window-pad);
+  font-style: normal;
+  font-size: var(--size-small);
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.site-updated {
+  margin-top: var(--window-pad);
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+/* ---- about --------------------------------------------------------------- */
+
+.about {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--window-pad) / 2);
+  height: 100%;
+  padding: var(--window-pad);
+}
+
+.about-heading {
+  font-family: var(--font-display);
+  font-size: calc(var(--size-ui) * 1.5);
+  font-weight: var(--weight-strong);
+  letter-spacing: var(--tracking-ui);
+}
+
+.about-sub {
+  color: var(--c-ink-muted);
+  font-size: var(--size-small);
+}
+
+.about-rows {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: var(--window-pad);
+}
+
+.about-row {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--window-pad);
+  padding: 2px 0;
+  border-bottom: var(--border-width) var(--border-style) var(--c-surface-alt);
+}
+
+.about-key {
+  color: var(--c-ink-muted);
+  font-size: var(--size-small);
+}
+
+.about-value {
+  font-family: var(--font-mono);
+}
+
+.about-seed-input {
+  width: 100%;
+  height: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  background: var(--c-field);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+}
+
+.about-seed-input.is-invalid {
+  border-color: var(--c-boot-fail);
+}
+
+.about-actions {
+  display: flex;
+  gap: calc(var(--window-pad) / 2);
+}
+
+.about-button {
+  flex: 1 1 auto;
+  height: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  font-size: var(--size-small);
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-control);
+  cursor: pointer;
+}
+
+.about-button:hover {
+  background: var(--c-bevel-light);
+}
+
+.about-button-primary {
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+  border-color: var(--c-accent);
+}
+
+.about-button-primary:hover {
+  background: var(--c-accent);
+  filter: brightness(1.12);
+}
+
+/* The one string on screen that is never generated. */
+.about-brand {
+  padding-top: calc(var(--window-pad) / 2);
+  font-family: var(--font-display);
+  font-size: var(--size-small);
+  letter-spacing: 0.12em;
+  text-align: center;
+  color: var(--c-ink-muted);
+}

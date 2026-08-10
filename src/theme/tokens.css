@@ -1,0 +1,110 @@
+/*
+ * THE TOKEN CONTRACT
+ *
+ * This is the entire surface the aesthetic generator drives. Nothing in the
+ * app may hardcode a colour, radius, font or duration — everything reads a
+ * token from here. Honour that and "generate a new aesthetic every boot"
+ * becomes a data change; break it and it becomes a refactor.
+ *
+ * The values below are one hand-authored default look (a warm grey
+ * workstation). They are a placeholder for the generator, not a house style.
+ *
+ * Axes the generator will roll, in the order they matter visually:
+ *   palette · typography · geometry · depth · texture · motion
+ */
+
+:root {
+  /* ---- palette ---------------------------------------------------------- */
+  --c-desktop: #4a5568;
+  --c-desktop-alt: #3b4553; /* wallpaper gradients / patterns */
+  --c-surface: #d8d4cc;
+  --c-surface-alt: #c9c4ba; /* inset panels, alternating rows */
+  --c-ink: #1c1a17;
+  --c-ink-muted: #6b655c;
+  --c-line: #8f887d;
+  --c-accent: #2d5f8a;
+  --c-accent-ink: #f4f1ea;
+  --c-field: #f4f1ea;
+  --c-bevel-light: #f0ece4;
+  --c-bevel-dark: #918a7e;
+
+  /* Titlebars carry most of a theme's identity, so they get their own slots
+     rather than reusing surface/accent. */
+  --c-title: #2d5f8a;
+  --c-title-ink: #f4f1ea;
+  --c-title-blur: #8b8a86;
+  --c-title-ink-blur: #ddd9d1;
+
+  /* ---- typography ------------------------------------------------------- */
+  --font-ui: system-ui, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "Consolas", monospace;
+  --font-display: var(--font-ui);
+  --size-ui: 13px;
+  --size-small: 11px;
+  --weight-ui: 400;
+  --weight-strong: 600;
+  --tracking-ui: 0em;
+  --leading-ui: 1.45;
+  /* Some aesthetics (ASCII, terminal) want uppercase chrome; most don't. */
+  --title-transform: none;
+
+  /* ---- geometry --------------------------------------------------------- */
+  --radius-window: 4px;
+  --radius-control: 3px;
+  --border-width: 1px;
+  --border-style: solid;
+  --titlebar-height: 26px;
+  --window-pad: 8px;
+  --control-height: 22px;
+  --resize-grip: 6px;
+  --taskbar-height: 30px;
+  --port-size: 13px;
+  --cable-width: 2px;
+
+  /* ---- depth ------------------------------------------------------------ */
+  --shadow-window: 0 6px 20px rgb(0 0 0 / 0.35);
+  --shadow-window-blur: 0 2px 8px rgb(0 0 0 / 0.2);
+  --shadow-control: none;
+
+  /* ---- texture ---------------------------------------------------------- */
+  /* Layered onto surfaces. The generator swaps in gradients, noise, scanlines,
+     hatching — anything expressible as a CSS background. */
+  --texture-desktop: linear-gradient(
+    160deg,
+    var(--c-desktop) 0%,
+    var(--c-desktop-alt) 100%
+  );
+  --texture-surface: none;
+  --texture-title: none;
+
+  /* ---- boot ------------------------------------------------------------- */
+  /* The boot screen runs before the desktop exists and traditionally ignores
+     the desktop palette entirely, so it gets its own slots. */
+  --c-boot-bg: #0b0d0c;
+  --c-boot-ink: #cfd6cf;
+  --c-boot-ok: #8fbf8f;
+  --c-boot-warn: #d6b45c;
+  --c-boot-fail: #cf7b6a;
+  --c-boot-dim: #6f7a70;
+  --font-boot: var(--font-mono);
+  --size-boot: 13px;
+
+  /* ---- motion ----------------------------------------------------------- */
+  --motion-fast: 90ms;
+  --motion-slow: 220ms;
+  --ease-ui: cubic-bezier(0.2, 0, 0.2, 1);
+}
+
+/* Aesthetics that want instant, mechanical chrome set this rather than
+   overriding every duration. Also the honest target for reduced-motion. */
+:root[data-motion="none"] {
+  --motion-fast: 0ms;
+  --motion-slow: 0ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --motion-fast: 0ms;
+    --motion-slow: 0ms;
+  }
+}
