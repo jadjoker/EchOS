@@ -167,8 +167,8 @@ src/
 
 ## Not done yet
 
-No git repo. Archetype expansion is the known gap (ECHOS-22) — ten archetypes
-means pages start rhyming after a dozen or so.
+Archetype expansion is the known gap (ECHOS-22 part B) — ten archetypes means
+pages start rhyming after a dozen or so, even now that layout varies.
 
 No generated cursors, wallpapers-with-imagery, or sound. No decorative junk
 beyond marquees and hit counters — no under-construction GIFs, webring badges or
