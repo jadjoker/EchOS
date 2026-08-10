@@ -8,6 +8,7 @@
  */
 
 import type { InfluenceNode } from "../core/graph.ts";
+import type { ActivityKind } from "../core/economy.ts";
 import type { Influence } from "../core/influence.ts";
 import type { Rng } from "../core/rng.ts";
 import type { Vfs } from "../fs/vfs.ts";
@@ -42,6 +43,13 @@ export interface AppContext {
    * real OS does: click a thing, get a window about that thing.
    */
   openWindow(spec: ChildWindowSpec): ChildWindow;
+  /**
+   * Report that the player did something. Raises the coin rate.
+   *
+   * Safe to call freely — a kind that is already saturated gains nothing, so
+   * an app cannot accidentally make itself the most profitable thing to spam.
+   */
+  nudge(kind: ActivityKind): void;
 }
 
 export interface AppInstance {

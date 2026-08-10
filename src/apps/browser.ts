@@ -245,6 +245,9 @@ export const browserApp: AppDef = {
       history.push(target);
       cursor = history.length - 1;
       show(target);
+      // Going somewhere counts as activity. Note this raises the *rate* — it
+      // does not pay per page, so refreshing the same site earns nothing extra.
+      ctx.nudge("navigate");
     }
 
     function updateNav(): void {

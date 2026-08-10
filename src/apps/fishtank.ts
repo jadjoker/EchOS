@@ -86,6 +86,7 @@ export const fishTankApp: AppDef = {
           f.vy -= rng.range(0.001, 0.003);
           f.vx += rng.range(-0.002, 0.002);
         }
+        ctx.nudge("tinker");
       }),
       caption,
     );
@@ -115,6 +116,7 @@ export const fishTankApp: AppDef = {
 
       if (!best || openProfiles.has(best)) return;
       openProfile(best);
+      ctx.nudge("inspect");
     });
 
     function openProfile(fish: Fish): void {

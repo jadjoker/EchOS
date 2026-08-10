@@ -132,7 +132,12 @@ export const weatherApp: AppDef = {
       panel.append(head, chart, list, remark);
     }
 
-    controls.append(button("Next reading", () => { offset += 1; render(); ctx.changed(); }));
+    controls.append(button("Next reading", () => {
+      offset += 1;
+      render();
+      ctx.changed();
+      ctx.nudge("tinker");
+    }));
     render();
 
     return {

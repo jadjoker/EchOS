@@ -36,6 +36,8 @@ const BASE_Z = 10;
 export class WindowManager {
   private readonly layer: HTMLElement;
   private readonly taskbar: HTMLElement;
+  private readonly taskbarItems: HTMLElement;
+  private readonly taskbarTray: HTMLElement;
   private readonly windows: Win[] = [];
   private readonly closeHooks = new Map<string, () => void>();
 
@@ -49,6 +51,14 @@ export class WindowManager {
 
     this.taskbar = document.createElement("div");
     this.taskbar.className = "taskbar";
+
+    // The window list is rebuilt wholesale on every change, so anything else
+    // living in the taskbar needs its own region or it gets wiped.
+    this.taskbarItems = document.createElement("div");
+    this.taskbarItems.className = "taskbar-items";
+    this.taskbarTray = document.createElement("div");
+    this.taskbarTray.className = "taskbar-tray";
+    this.taskbar.append(this.taskbarItems, this.taskbarTray);
 
     screen.append(this.layer, this.taskbar);
 
@@ -137,8 +147,13 @@ export class WindowManager {
     this.renderTaskbar();
   }
 
+  /** Park a persistent element at the right-hand end of the taskbar. */
+  setTray(element: HTMLElement): void {
+    this.taskbarTray.replaceChildren(element);
+  }
+
   private renderTaskbar(): void {
-    this.taskbar.replaceChildren();
+    this.taskbarItems.replaceChildren();
     for (const win of this.windows) {
       const button = document.createElement("button");
       button.type = "button";
@@ -152,7 +167,7 @@ export class WindowManager {
         if (win.isFocused() && !win.isMinimized()) this.setMinimized(win, true);
         else this.focus(win);
       });
-      this.taskbar.append(button);
+      this.taskbarItems.append(button);
     }
   }
 

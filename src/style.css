@@ -450,6 +450,63 @@ body.is-patching .port-in {
   border-top: var(--border-width) var(--border-style) var(--c-line);
 }
 
+.taskbar-items {
+  display: flex;
+  flex: 1 1 auto;
+  gap: calc(var(--window-pad) / 2);
+  min-width: 0;
+  overflow: hidden;
+}
+
+.taskbar-tray {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  margin-left: auto;
+}
+
+/* ---- wallet -------------------------------------------------------------- */
+
+.wallet {
+  display: flex;
+  gap: calc(var(--window-pad) / 2);
+  align-items: center;
+  height: var(--control-height);
+  padding: 0 var(--window-pad);
+  font-size: var(--size-small);
+  background: var(--c-surface);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  cursor: default;
+}
+
+.wallet-glyph {
+  color: var(--c-accent);
+}
+
+.wallet-amount {
+  min-width: 3.5em;
+  font-family: var(--font-mono);
+  text-align: right;
+}
+
+/* Without a visible meter the rate multiplier is a mechanic nobody learns. */
+.wallet-meter {
+  width: 34px;
+  height: 5px;
+  overflow: hidden;
+  background: var(--c-surface-alt);
+  border: var(--border-width) solid var(--c-line);
+}
+
+.wallet-meter-fill {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: var(--c-accent);
+  transition: width var(--motion-slow) var(--ease-ui);
+}
+
 .taskbar-item {
   max-width: 180px;
   height: var(--control-height);

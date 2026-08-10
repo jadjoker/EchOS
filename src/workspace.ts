@@ -13,6 +13,7 @@
 
 import { Graph } from "./core/graph.ts";
 import { describeInfluence } from "./core/influence.ts";
+import type { Economy } from "./core/economy.ts";
 import type { Rng } from "./core/rng.ts";
 import type { Vfs } from "./fs/vfs.ts";
 import type { AppDef } from "./apps/types.ts";
@@ -42,6 +43,7 @@ export class Workspace {
     private readonly wm: WindowManager,
     private readonly rng: Rng,
     private readonly vfs: Vfs,
+    private readonly economy: Economy,
   ) {
     this.svg = document.createElementNS(SVG_NS, "svg");
     this.svg.setAttribute("class", "cable-layer");
@@ -94,6 +96,7 @@ export class Workspace {
         });
         return { close: () => this.wm.close(child) };
       },
+      nudge: (kind) => this.economy.nudge(kind),
     });
 
     this.graph.add(instance.node);
@@ -120,6 +123,7 @@ export class Workspace {
     win.el.dataset["node"] = id;
     this.attachPort(win, id, "in");
     this.attachPort(win, id, "out");
+    this.economy.nudge("window");
     return id;
   }
 
@@ -169,6 +173,7 @@ export class Workspace {
           setTimeout(() => target.classList.remove("is-reject"), 700);
         } else {
           this.graph.connect(from, to);
+          this.economy.nudge("connect");
           target.classList.add("is-flash");
           setTimeout(() => target.classList.remove("is-flash"), 500);
         }

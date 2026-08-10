@@ -10,6 +10,8 @@ import { generateTheme, applyTheme } from "./theme/generate.ts";
 import { WindowManager } from "./wm/manager.ts";
 import { createAbout } from "./shell/about.ts";
 import { Workspace } from "./workspace.ts";
+import { Economy } from "./core/economy.ts";
+import { createWallet } from "./shell/wallet.ts";
 import { createDesktopIcons, type IconSpec } from "./desktop/icons.ts";
 import { browserApp } from "./apps/browser.ts";
 import { fishTankApp } from "./apps/fishtank.ts";
@@ -56,7 +58,12 @@ async function main(): Promise<void> {
 
   const wm = new WindowManager(screen);
 
-  const workspace = new Workspace(screen, wm, rng, vfs);
+  // Coins outlive the machine they were earned on — see core/economy.ts.
+  const economy = new Economy();
+  economy.start();
+  wm.setTray(createWallet(economy));
+
+  const workspace = new Workspace(screen, wm, rng, vfs, economy);
 
   // Nothing opens on boot. An empty desktop you have to explore reads as a
   // machine somebody left behind; a pre-arranged set of windows reads as a demo.
