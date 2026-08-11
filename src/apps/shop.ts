@@ -50,6 +50,12 @@ const UPGRADES: UpgradeOffer[] = [
     blurb: "Room for four more on top of the annexe. Absurd, and you will want it." },
 ];
 
+/** A shelf row that owns its element and knows how to update it in place. */
+interface Row {
+  el: HTMLElement;
+  refresh(): void;
+}
+
 interface FishOffer {
   key: string;
   name: string;
@@ -192,13 +198,13 @@ export const shopApp: AppDef = {
 
     function itemRow(
       title: string,
-      detail: string,
-      price: number | null,
-      action: (() => void) | null,
-      state: "" | "sold" | "owned",
-    ): HTMLElement {
+      price: number,
+      action: () => void,
+      detailNow: () => string,
+      stateNow: () => "" | "sold" | "owned",
+    ): Row {
       const row = document.createElement("div");
-      row.className = `shop-item${state ? ` is-${state}` : ""}`;
+      row.className = "shop-item";
 
       const text = document.createElement("div");
       text.className = "shop-item-text";
@@ -207,26 +213,39 @@ export const shopApp: AppDef = {
       heading.textContent = title;
       const sub = document.createElement("div");
       sub.className = "shop-item-detail";
-      sub.textContent = detail;
       text.append(heading, sub);
 
       const buy = document.createElement("button");
       buy.type = "button";
       buy.className = "shop-buy";
-      if (state === "sold") {
-        buy.textContent = "sold";
-        buy.disabled = true;
-      } else if (state === "owned") {
-        buy.textContent = "fitted";
-        buy.disabled = true;
-      } else {
-        buy.textContent = price === null ? "—" : formatCoins(price);
-        buy.disabled = price !== null && ctx.economy.balance < price;
-        if (action) buy.addEventListener("click", action);
-      }
+      // Bound ONCE. Rebuilding this button on every economy tick was the bug:
+      // the balance changes four times a second, so a real press-and-release
+      // straddled a rebuild and the click event never fired. Programmatic
+      // .click() is synchronous and never noticed.
+      buy.addEventListener("click", action);
 
       row.append(text, buy);
-      return row;
+
+      return {
+        el: row,
+        refresh() {
+          const state = stateNow();
+          row.classList.toggle("is-sold", state === "sold");
+          row.classList.toggle("is-owned", state === "owned");
+          sub.textContent = detailNow();
+
+          if (state === "sold") {
+            buy.textContent = "sold";
+            buy.disabled = true;
+          } else if (state === "owned") {
+            buy.textContent = "fitted";
+            buy.disabled = true;
+          } else {
+            buy.textContent = formatCoins(price);
+            buy.disabled = ctx.economy.balance < price;
+          }
+        },
+      };
     }
 
     function section(label: string): HTMLElement {
@@ -236,42 +255,52 @@ export const shopApp: AppDef = {
       return el;
     }
 
+    // Built once; only the labels and disabled states change afterwards.
+    const rows: Row[] = [];
+
+    list.append(section("Livestock"));
+    for (const offer of offers) {
+      const row = itemRow(
+        `${offer.name} — ${offer.species}`,
+        offer.price,
+        () => buyFish(offer),
+        () => offer.note,
+        () => (sold.has(offer.key) ? "sold" : ""),
+      );
+      rows.push(row);
+      list.append(row.el);
+    }
+    {
+      const row = itemRow("Unmarked egg", 70, buyEgg,
+        () => "Nobody is certain what is in it.", () => "");
+      rows.push(row);
+      list.append(row.el);
+    }
+
+    list.append(section("Sundries"));
+    {
+      const row = itemRow("Tin of flake", 20, buyFood,
+        () => (ctx.collection.food > 0 ? `${ctx.collection.food} feeds left` : "Ten feeds"),
+        () => "");
+      rows.push(row);
+      list.append(row.el);
+    }
+
+    list.append(section("Fittings"));
+    for (const upgrade of UPGRADES) {
+      const row = itemRow(upgrade.label, upgrade.price, () => buyUpgrade(upgrade),
+        () => upgrade.blurb,
+        () => (ctx.collection.has(upgrade.id) ? "owned" : ""));
+      rows.push(row);
+      list.append(row.el);
+    }
+
+    list.append(notice);
+
     function render(): void {
       balance.textContent = `${formatCoins(ctx.economy.balance)} coins · tank ${ctx.collection.fish.length}/${ctx.collection.capacity}`;
-      list.replaceChildren();
-
-      list.append(section("Livestock"));
-      for (const offer of offers) {
-        list.append(itemRow(
-          `${offer.name} — ${offer.species}`,
-          offer.note,
-          offer.price,
-          () => buyFish(offer),
-          sold.has(offer.key) ? "sold" : "",
-        ));
-      }
-      list.append(itemRow("Unmarked egg", "Nobody is certain what is in it.", 70, buyEgg, ""));
-
-      list.append(section("Sundries"));
-      list.append(itemRow(
-        "Tin of flake",
-        ctx.collection.food > 0 ? `${ctx.collection.food} feeds left` : "Ten feeds",
-        20, buyFood, "",
-      ));
-
-      list.append(section("Fittings"));
-      for (const upgrade of UPGRADES) {
-        list.append(itemRow(
-          upgrade.label,
-          upgrade.blurb,
-          upgrade.price,
-          () => buyUpgrade(upgrade),
-          ctx.collection.has(upgrade.id) ? "owned" : "",
-        ));
-      }
-
+      for (const row of rows) row.refresh();
       notice.textContent = flash || "Stock varies by machine. A different computer sells different fish.";
-      list.append(notice);
     }
 
     // Prices grey out as the balance moves, so affordability is visible without
