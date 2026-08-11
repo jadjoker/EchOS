@@ -11,6 +11,7 @@
 
 import type { AppDef } from "./types.ts";
 import type { Agent, Influence } from "../core/influence.ts";
+import type { Rng } from "../core/rng.ts";
 import { appShell, button } from "./controls.ts";
 import { personName } from "../gen/places.ts";
 import { generateLore, loreWords, type FishLore } from "../gen/fishlore.ts";
@@ -25,11 +26,42 @@ const SPECIES_TAIL = `barb tetra danio rasbora guppy molly platy loach gourami
 const PET_NAMES = `Doug Marbles Biscuit Nelson Admiral Tiny Bubbles Kevin Pearl
   Smudge Captain Jaws Gilbert Norman Sausage Duchess Rocket`.trim().split(/\s+/);
 
+/**
+ * How an individual fish moves.
+ *
+ * Derived from the temperament already recorded in its lore, so the profile
+ * window and the tank agree: a fish described as "highly strung" darts, and one
+ * described as "resigned" sits near the bottom barely moving. The description
+ * stops being flavour text the moment it predicts behaviour.
+ */
+interface Swim {
+  /** Speed multiplier. */
+  cruise: number;
+  /** How much the heading drifts of its own accord. */
+  wander: number;
+  /** Per-frame chance of a sudden burst. */
+  dart: number;
+  /** Preferred height, 0 top to 1 bottom. */
+  depth: number;
+  /** How insistently that depth is held. */
+  depthPull: number;
+  /** Positive draws toward other fish, negative pushes away. */
+  school: number;
+  /** 0 roams the whole tank, 1 stays on a patch. */
+  home: number;
+  homeX: number;
+  homeY: number;
+  /** Tail animation offset and speed, so they are not all in step. */
+  phase: number;
+  beat: number;
+}
+
 interface Fish {
   x: number; y: number; vx: number; vy: number;
   size: number; hue: number;
   name: string; species: string;
   dead: boolean;
+  swim: Swim;
   /** Residents have a history. Visitors from other programs do not. */
   lore?: FishLore;
   /** Bought, and therefore carried to the next machine. */
@@ -38,6 +70,40 @@ interface Fish {
   collectionId?: string;
   /** Foreign agents drawn as guests rather than residents. */
   guest?: Agent;
+}
+
+/** Movement profiles, keyed by the temperaments fishlore.ts can produce. */
+const TEMPERAMENTS: Record<string, Partial<Swim>> = {
+  placid: { cruise: 0.6, wander: 0.15, dart: 0.002, depthPull: 0.5 },
+  resigned: { cruise: 0.4, wander: 0.08, dart: 0, depth: 0.78, depthPull: 0.7 },
+  unbothered: { cruise: 0.8, wander: 0.3, dart: 0.004 },
+  restless: { cruise: 1.5, wander: 0.85, dart: 0.02, depthPull: 0.15 },
+  "highly strung": { cruise: 1.7, wander: 1, dart: 0.045, depthPull: 0.1 },
+  curious: { cruise: 1.05, wander: 0.55, dart: 0.012, school: 0.35 },
+  watchful: { cruise: 0.85, wander: 0.25, dart: 0.03, depthPull: 0.6 },
+  territorial: { cruise: 0.95, wander: 0.35, home: 0.85, school: -0.2 },
+  withdrawn: { cruise: 0.65, wander: 0.2, depth: 0.8, depthPull: 0.75, school: -0.4 },
+  sociable: { cruise: 1.0, wander: 0.4, school: 0.7 },
+  particular: { cruise: 0.8, wander: 0.2, depthPull: 0.95 },
+};
+
+function swimFor(rng: Rng, temperament: string | undefined, x: number, y: number): Swim {
+  const base: Swim = {
+    cruise: 1, wander: 0.4, dart: 0.008,
+    depth: rng.range(0.3, 0.7), depthPull: 0.35,
+    school: 0, home: 0, homeX: x, homeY: y,
+    phase: rng.range(0, Math.PI * 2),
+    beat: rng.range(5, 11),
+  };
+  const profile = temperament ? TEMPERAMENTS[temperament] : undefined;
+  // Every fish still gets its own roll on top of its temperament, so two
+  // placid fish are alike without being identical.
+  return {
+    ...base,
+    ...profile,
+    cruise: (profile?.cruise ?? base.cruise) * rng.range(0.82, 1.2),
+    depth: profile?.depth ?? base.depth,
+  };
 }
 
 export const fishTankApp: AppDef = {
@@ -61,17 +127,23 @@ export const fishTankApp: AppDef = {
     caption.className = "tank-caption";
 
     const count = rng.int(4, 8);
-    const residents: Fish[] = Array.from({ length: count }, (_, i) => ({
-      x: rng.range(0.1, 0.9), y: rng.range(0.15, 0.85),
-      vx: rng.range(-0.0016, 0.0016) || 0.001,
-      vy: rng.range(-0.0006, 0.0006),
-      size: rng.range(0.05, 0.11),
-      hue: rng.int(0, 359),
-      name: rng.pick(PET_NAMES),
-      species: `${rng.pick(SPECIES_HEAD)} ${rng.pick(SPECIES_TAIL)}`,
-      dead: i === 0,
-      lore: generateLore(rng, i === 0),
-    }));
+    const residents: Fish[] = Array.from({ length: count }, (_, i) => {
+      const x = rng.range(0.1, 0.9);
+      const y = rng.range(0.15, 0.85);
+      const lore = generateLore(rng, i === 0);
+      return {
+        x, y,
+        vx: rng.range(-0.0016, 0.0016) || 0.001,
+        vy: rng.range(-0.0006, 0.0006),
+        size: rng.range(0.05, 0.11),
+        hue: rng.int(0, 359),
+        name: rng.pick(PET_NAMES),
+        species: `${rng.pick(SPECIES_HEAD)} ${rng.pick(SPECIES_TAIL)}`,
+        dead: i === 0,
+        lore,
+        swim: swimFor(rng, lore.temperament, x, y),
+      };
+    });
 
     // Your fish join the machine's own. The previous owner's fish and yours
     // sharing a tank is the whole premise in one window: the computer is
@@ -89,16 +161,20 @@ export const fishTankApp: AppDef = {
         .map((f) => {
           const already = existing.get(f.id);
           if (already) return already; // keep it swimming where it was
+
+          // New arrivals swim in from the edge, so a purchase is visible as an
+          // event rather than appearing fully formed mid-tank.
+          const fromLeft = rng.chance(0.5);
+          const x = fromLeft ? 0.04 : 0.96;
+          const y = rng.range(0.25, 0.75);
           return {
-            // New arrivals swim in from the edge, so a purchase is visible as
-            // an event rather than appearing fully formed mid-tank.
-            x: rng.chance(0.5) ? 0.04 : 0.96,
-            y: rng.range(0.25, 0.75),
-            vx: rng.range(-0.0016, 0.0016) || 0.0012,
+            x, y,
+            vx: (fromLeft ? 1 : -1) * rng.range(0.0012, 0.0022),
             vy: rng.range(-0.0006, 0.0006),
             size: f.size, hue: f.hue,
             name: f.name, species: f.species,
             dead: false, lore: f.lore, mine: true, collectionId: f.id,
+            swim: swimFor(rng, f.lore.temperament, rng.range(0.2, 0.8), y),
           };
         });
       updateCaption();
@@ -301,12 +377,16 @@ export const fishTankApp: AppDef = {
 
       const speed = (1 - chill * 0.7) * (1 + agitation * 1.6);
 
-      for (const f of everyone()) {
+      const crowd = everyone();
+
+      for (const f of crowd) {
         if (f.dead) {
           f.x += 0.0002;
           if (f.x > 1) f.x = 0;
           f.y = 0.06 + Math.sin(time / 1400) * 0.004;
         } else {
+          const s = f.swim;
+
           // Flake is what makes the tin worth buying: fish break off whatever
           // they were doing and go for it, and it disappears when eaten.
           let target = -1;
@@ -324,23 +404,72 @@ export const fishTankApp: AppDef = {
             } else {
               f.vx += Math.sign(flake.x - f.x) * 0.00035;
               f.vy += Math.sign(flake.y - f.y) * 0.00030;
-              f.vx = Math.max(-0.006, Math.min(0.006, f.vx));
-              f.vy = Math.max(-0.005, Math.min(0.005, f.vy));
             }
           } else {
-            f.vy += (0.5 - f.y) * 0.00004;
+            // Hold a preferred depth. This alone separates the tank into
+            // layers instead of everything milling around the middle.
+            f.vy += (s.depth - f.y) * 0.00006 * s.depthPull;
+
+            // Aimless drift. Math.random rather than the seeded stream —
+            // frame-by-frame noise is not part of a machine's identity, and
+            // consuming the seed at 60fps would make it meaningless.
+            f.vx += (Math.random() - 0.5) * 0.00036 * s.wander;
+            f.vy += (Math.random() - 0.5) * 0.00024 * s.wander;
+
+            // Sudden bursts. The single biggest contributor to a tank looking
+            // alive rather than mechanical.
+            if (Math.random() < s.dart) {
+              f.vx += (Math.random() - 0.5) * 0.012;
+              f.vy += (Math.random() - 0.5) * 0.006;
+            }
+
+            if (s.home > 0) {
+              f.vx += (s.homeX - f.x) * 0.00008 * s.home;
+              f.vy += (s.homeY - f.y) * 0.00008 * s.home;
+            }
+
+            if (s.school !== 0) {
+              let nx = 0, ny = 0, closest = 0.4;
+              for (const other of crowd) {
+                if (other === f || other.dead) continue;
+                const distance = Math.hypot(other.x - f.x, other.y - f.y);
+                if (distance < closest && distance > 0.001) {
+                  closest = distance;
+                  nx = other.x - f.x;
+                  ny = other.y - f.y;
+                }
+              }
+              if (closest < 0.4) {
+                f.vx += Math.sign(nx) * 0.00014 * s.school;
+                f.vy += Math.sign(ny) * 0.00011 * s.school;
+              }
+            }
+          }
+
+          // Per-fish speed limit, so a placid fish stays placid however much
+          // it has been jostled.
+          const ceiling = 0.0038 * s.cruise;
+          const magnitude = Math.hypot(f.vx, f.vy);
+          if (magnitude > ceiling) {
+            f.vx = (f.vx / magnitude) * ceiling;
+            f.vy = (f.vy / magnitude) * ceiling;
           }
 
           f.x += f.vx * speed;
           f.y += f.vy * speed;
           f.vy *= 0.995;
-          if (f.x < 0.05 || f.x > 0.95) f.vx *= -1;
-          if (f.y < 0.1 || f.y > 0.88) f.vy *= -1;
+
+          // Reverse ONLY when actually heading into the wall. Testing position
+          // alone was the bug: the clamp holds a fish inside the boundary band,
+          // so it flipped its velocity every frame and vibrated in place.
+          if ((f.x < 0.05 && f.vx < 0) || (f.x > 0.95 && f.vx > 0)) f.vx *= -1;
+          if ((f.y < 0.1 && f.vy < 0) || (f.y > 0.88 && f.vy > 0)) f.vy *= -1;
+
           f.x = Math.min(0.97, Math.max(0.03, f.x));
           f.y = Math.min(0.9, Math.max(0.08, f.y));
         }
 
-        drawCreature(c, f, w, h);
+        drawCreature(c, f, w, h, time);
       }
 
       frame = requestAnimationFrame(step);
@@ -390,17 +519,24 @@ export const fishTankApp: AppDef = {
           guests = influence.agents
             .filter((a) => a.kind !== "fish" || ![...residents, ...owned].some((f) => f.name === a.label))
             .slice(0, 10)
-            .map((agent) => ({
-              x: rng.range(0.1, 0.9), y: rng.range(0.2, 0.8),
-              vx: (rng.chance(0.5) ? 1 : -1) * (0.0006 + agent.speed * 0.0016),
-              vy: rng.range(-0.0004, 0.0004),
-              size: 0.03 + agent.size * 0.05,
-              hue: agent.hue,
-              name: agent.label,
-              species: agent.kind,
-              dead: false,
-              guest: agent,
-            }));
+            .map((agent) => {
+              const x = rng.range(0.1, 0.9);
+              const y = rng.range(0.2, 0.8);
+              return {
+                x, y,
+                vx: (rng.chance(0.5) ? 1 : -1) * (0.0006 + agent.speed * 0.0016),
+                vy: rng.range(-0.0004, 0.0004),
+                size: 0.03 + agent.size * 0.05,
+                hue: agent.hue,
+                name: agent.label,
+                species: agent.kind,
+                dead: false,
+                guest: agent,
+                // Visitors have no temperament on record, so they get the
+                // baseline roll — restless enough to read as out of place.
+                swim: swimFor(rng, undefined, x, y),
+              };
+            });
 
           // Borrowed vocabulary renames the machine's fish — hook the browser
           // up and they are named after whatever you were reading.
@@ -500,12 +636,21 @@ function drawCreature(
   f: Fish,
   w: number,
   h: number,
+  time: number,
 ): void {
   const px = f.x * w;
   const py = f.y * h;
   const size = f.size * h;
   const facing = f.vx >= 0 ? 1 : -1;
   const colour = f.dead ? "#8a8a8a" : `hsl(${f.hue} 70% 60%)`;
+
+  // Tail beat scales with effort, so a darting fish visibly thrashes and a
+  // drifting one barely moves. Rigid sliding shapes were most of why the tank
+  // read as mechanical.
+  const effort = Math.min(1, Math.hypot(f.vx, f.vy) / 0.004);
+  const beat = f.dead
+    ? 0
+    : Math.sin(time / 1000 * f.swim.beat + f.swim.phase) * (0.25 + effort * 0.75);
 
   c.save();
   c.translate(px, py);
@@ -544,14 +689,28 @@ function drawCreature(
   }
 
   c.scale(facing, f.dead ? -1 : 1);
+  // The whole body leans into the stroke, not just the tail.
+  c.rotate(beat * 0.09);
+
   c.fillStyle = colour;
   c.beginPath();
   c.ellipse(0, 0, size, size * 0.45, 0, 0, Math.PI * 2);
   c.fill();
+
+  // Tail sweeps opposite the lean.
+  const sweep = -beat * size * 0.42;
   c.beginPath();
   c.moveTo(-size, 0);
-  c.lineTo(-size * 1.7, -size * 0.5);
-  c.lineTo(-size * 1.7, size * 0.5);
+  c.lineTo(-size * 1.7, -size * 0.5 + sweep);
+  c.lineTo(-size * 1.7, size * 0.5 + sweep);
+  c.closePath();
+  c.fill();
+
+  // A dorsal fin, which also gives the silhouette something to differ by.
+  c.beginPath();
+  c.moveTo(size * 0.2, -size * 0.4);
+  c.lineTo(-size * 0.2, -size * 0.85 - beat * size * 0.08);
+  c.lineTo(-size * 0.5, -size * 0.35);
   c.closePath();
   c.fill();
   c.fillStyle = "#000";
