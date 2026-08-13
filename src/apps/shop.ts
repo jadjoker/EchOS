@@ -19,6 +19,7 @@ import { formatCoins } from "../core/economy.ts";
 import { generateLore } from "../gen/fishlore.ts";
 import { mountSolid } from "../gen/solid.ts";
 import { GOODS } from "../gen/goods.ts";
+import { formFor } from "../gen/fishform.ts";
 import { tokenHsl } from "../theme/color.ts";
 import { mountFish3d } from "./fish3d.ts";
 import { appShell } from "./controls.ts";
@@ -255,12 +256,18 @@ export const shopApp: AppDef = {
      * ones in the tank can. Everything else is a lathed solid from the table
      * above.
      */
-    function productWell(kind: { fishHue: number } | { product: string }): HTMLElement {
+    function productWell(kind: { fish: FishOffer } | { product: string }): HTMLElement {
       const well = document.createElement("div");
       well.className = "shop-item-model";
 
-      if ("fishHue" in kind) {
-        models.push(mountFish3d(well, { hue: kind.fishHue, deceased: false }));
+      if ("fish" in kind) {
+        // The same body the tank will give it, so what you buy is what swims.
+        models.push(mountFish3d(well, {
+          hue: kind.fish.hue,
+          deceased: false,
+          form: formFor(kind.fish.species, kind.fish.hue,
+            ctx.rng.derive(`shopform:${kind.fish.key}`)),
+        }));
         return well;
       }
 
@@ -350,7 +357,7 @@ export const shopApp: AppDef = {
         () => buyFish(offer),
         () => `${offer.species} · ${offer.note}`,
         () => (sold.has(offer.key) ? "sold" : ""),
-        productWell({ fishHue: offer.hue }),
+        productWell({ fish: offer }),
       );
       rows.push(row);
       list.append(row.el);

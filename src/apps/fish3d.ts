@@ -12,6 +12,7 @@
  */
 
 import { honk } from "../core/sound.ts";
+import type { FishForm } from "../gen/fishform.ts";
 
 type Vec3 = readonly [number, number, number];
 
@@ -70,6 +71,48 @@ export interface Fish3dOptions {
   hue: number;
   /** Grey and still, for the one nobody removed. */
   deceased: boolean;
+  /**
+   * The body its species asks for. Optional, and when it is missing the model
+   * is the plain fish above, which is what every fish looked like before
+   * gen/fishform.ts existed.
+   */
+  form?: FishForm | undefined;
+}
+
+/**
+ * The eleven triangles, stretched to the proportions the tank is drawing.
+ *
+ * Without this the shelf and the water disagreed: a Whiptail loach swam past
+ * as a long thin thing trailing a tail, and the same fish on its profile card
+ * was the same generic model as everything else. Buying a fish and watching it
+ * change shape on the way in is a seam, and a seam in the one object the game
+ * asks you to care about.
+ *
+ * Only the SILHOUETTE carries over. Markings do not: at 84 pixels with flat
+ * shading there is nowhere to put them, and a spotted fish whose spots
+ * appeared in one window and not the other would be a worse mismatch than the
+ * one being fixed. The overall Dwarf-to-Emperor scaling does not carry either,
+ * because the model is fitted to its canvas and every fish gets the same frame.
+ */
+function shapeVertices(form: FishForm | undefined): Vec3[] {
+  if (!form) return V;
+
+  // Against the plain fish, which sits at roughly these proportions.
+  const xk = form.len;
+  const yk = form.depth / 0.9;
+  const dorsalK = form.dorsal / 0.8;
+
+  return V.map(([x, y, z], index) => {
+    // 6 and 7 are the tail tips, 10 is the point of the dorsal fin.
+    const isTailTip = index === 6 || index === 7;
+    const isDorsalTip = index === 10;
+    const stretch = isTailTip ? form.tailScale : 1;
+    return [
+      x * xk * (isTailTip ? Math.max(1, form.tailScale * 0.85) : 1),
+      y * yk * stretch * (isDorsalTip ? dorsalK : 1),
+      z * yk,
+    ];
+  });
 }
 
 /**
@@ -97,6 +140,9 @@ export function mountFish3d(
   const SETTLE_AFTER = 900;
   /** Screen pixels to radians. Roughly a full turn across the canvas. */
   const DRAG_SCALE = 0.02;
+
+  // Measured once. The proportions never change while it is mounted.
+  const verts = shapeVertices(options.form);
 
   let raf = 0;
   let angle = options.deceased ? Math.PI * 0.15 : 0;
@@ -217,7 +263,7 @@ export function mountFish3d(
     const driftX = wobble(time * 0.7 + phase + 300) * SIZE * 0.012 * jitter;
     const driftY = wobble(time * 1.1 + phase) * SIZE * 0.055 * jitter;
 
-    const projected = V.map((v) => {
+    const projected = verts.map((v) => {
       const r = rotateZ(rotateY(v, shown), roll);
       // Weak perspective — enough to read as 3D, not enough to look modern.
       const depth = 1 / (2.6 - r[2] * 0.5);

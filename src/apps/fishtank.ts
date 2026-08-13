@@ -386,7 +386,7 @@ export const fishTankApp: AppDef = {
 
         const bust = document.createElement("div");
         bust.className = "fish-row-model";
-        const model = mountFish3d(bust, { hue: fish.hue, deceased: fish.dead });
+        const model = mountFish3d(bust, { hue: fish.hue, deceased: fish.dead, form: fish.form });
 
         const name = document.createElement("span");
         name.className = "fish-row-name";
@@ -934,7 +934,7 @@ function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose:
 
   const stage = document.createElement("div");
   stage.className = "profile-model";
-  const model = mountFish3d(stage, { hue: fish.hue, deceased: fish.dead });
+  const model = mountFish3d(stage, { hue: fish.hue, deceased: fish.dead, form: fish.form });
 
   const name = document.createElement("div");
   name.className = "profile-name";
