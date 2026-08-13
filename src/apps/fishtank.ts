@@ -14,6 +14,7 @@ import type { Agent, Influence } from "../core/influence.ts";
 import type { Rng } from "../core/rng.ts";
 import { appShell, button } from "./controls.ts";
 import { generateLore, loreWords, type FishLore } from "../gen/fishlore.ts";
+import { formFor, type FishForm } from "../gen/fishform.ts";
 import { mountFish3d } from "./fish3d.ts";
 import { award } from "../core/achievements.ts";
 import tankFootage from "../assets/tank-vintage-scuba.mp4";
@@ -72,6 +73,11 @@ interface Fish {
   name: string; species: string;
   dead: boolean;
   swim: Swim;
+  /**
+   * The body its species name asks for. Absent on guests, which keep the
+   * shape of whatever program they arrived from.
+   */
+  form?: FishForm;
   /** Residents have a history. Visitors from other programs do not. */
   lore?: FishLore;
   /** Bought, and therefore carried to the next machine. */
@@ -182,15 +188,26 @@ export const fishTankApp: AppDef = {
       const x = rng.range(0.1, 0.9);
       const y = rng.range(0.15, 0.85);
       const lore = generateLore(rng, graveyard || i === 0);
+      const size = rng.range(0.05, 0.11);
+      const hue = rng.int(0, 359);
+      const name = takeName();
+      const species = `${rng.pick(SPECIES_HEAD)} ${rng.pick(SPECIES_TAIL)}`;
+      // Its own substream, so giving fish bodies shifted no other roll and
+      // every seed already shared still boots the same machine.
+      const form = formFor(species, hue, rng.derive(`form:${name}:${species}`));
       return {
         x, y,
         vx: rng.range(-0.0016, 0.0016) || 0.001,
         vy: rng.range(-0.0006, 0.0006),
-        size: rng.range(0.05, 0.11),
-        hue: rng.int(0, 359),
-        name: takeName(),
-        species: `${rng.pick(SPECIES_HEAD)} ${rng.pick(SPECIES_TAIL)}`,
+        // Scaled here rather than at draw time so that clicking a Dwarf, and
+        // the shoal keeping its distance from an Emperor, both use the size
+        // the fish actually appears to be.
+        size: size * form.scale,
+        hue,
+        name,
+        species,
         dead: graveyard || i === 0,
+        form,
         lore,
         swim: swimFor(rng, lore.temperament, x, y),
       };
@@ -229,11 +246,15 @@ export const fishTankApp: AppDef = {
           const fromLeft = rng.chance(0.5);
           const x = fromLeft ? 0.04 : 0.96;
           const y = rng.range(0.25, 0.75);
+          // Keyed on the collection id, so a fish you have owned for months
+          // has the same markings in every machine it is carried into.
+          const form = formFor(f.species, f.hue, rng.derive(`form:${f.id}`));
           return {
             x, y,
             vx: (fromLeft ? 1 : -1) * rng.range(0.0012, 0.0022),
             vy: rng.range(-0.0006, 0.0006),
-            size: f.size, hue: f.hue,
+            size: f.size * form.scale, hue: f.hue,
+            form,
             name: f.name, species: f.species,
             // On a graveyard machine yours float too, so the joke actually
             // lands. Nothing is written back: this is a property of the tank
@@ -1031,30 +1052,203 @@ function drawCreature(
   // The whole body leans into the stroke, not just the tail.
   c.rotate(beat * 0.09);
 
-  c.fillStyle = colour;
-  c.beginPath();
-  c.ellipse(0, 0, size, size * 0.45, 0, 0, Math.PI * 2);
-  c.fill();
+  drawBody(c, f, size, beat);
+  c.restore();
+}
 
-  // Tail sweeps opposite the lean.
-  const sweep = -beat * size * 0.42;
+/**
+ * The fish itself, built to whatever its species name asked for.
+ *
+ * Everything here reads from `f.form` (see gen/fishform.ts) and falls back to
+ * the plain ellipse-and-triangle if there is not one, because guests and
+ * anything generated before this existed still have to draw.
+ */
+function drawBody(c: CanvasRenderingContext2D, f: Fish, size: number, beat: number): void {
+  const form = f.form;
+  const len = form?.len ?? 1;
+  const depth = form?.depth ?? 0.9;
+  const halfDepth = size * depth * 0.5;
+  const tailScale = form?.tailScale ?? 1;
+
+  // A dead fish is grey and unmarked. Markings on a corpse read as a rendering
+  // fault rather than as a fish, and the grey is what says "this one is not
+  // coming back" at a glance.
+  const hue = form?.hue ?? f.hue;
+  const finish = f.dead ? null : form?.finish ?? null;
+  const alpha = finish === "glass" ? 0.5 : finish === "ghost" ? 0.36 : 1;
+  const sat = finish === "metal" ? 62 : finish === "velvet" ? 34 : 70;
+  const light = finish === "velvet" ? 46 : finish === "ghost" ? 78 : 60;
+
+  const skin = f.dead ? "#8a8a8a" : `hsla(${hue} ${sat}% ${light}% / ${alpha})`;
+  const dark = f.dead ? "#6f6f6f" : `hsla(${hue} ${sat}% ${Math.max(12, light - 26)}% / ${alpha})`;
+  const pale = f.dead ? "#a2a2a2" : `hsla(${hue} ${sat}% ${Math.min(92, light + 24)}% / ${alpha})`;
+
+  const bodyPath = (): void => {
+    c.beginPath();
+    c.ellipse(0, 0, size * len, halfDepth, 0, 0, Math.PI * 2);
+  };
+
+  // Tail first, so the body sits over the root of it.
+  const tx = -size * len;
+  const sweep = -beat * size * 0.34;
+  c.fillStyle = dark;
   c.beginPath();
-  c.moveTo(-size, 0);
-  c.lineTo(-size * 1.7, -size * 0.5 + sweep);
-  c.lineTo(-size * 1.7, size * 0.5 + sweep);
+  switch (form?.tail ?? "plain") {
+    case "whip":
+      c.moveTo(tx, 0);
+      c.quadraticCurveTo(tx - size * 1.5 * tailScale, sweep * 2.2, tx - size * 2.4 * tailScale, sweep * 3 - size * 0.1);
+      c.quadraticCurveTo(tx - size * 1.4 * tailScale, sweep * 1.6 + size * 0.18, tx, size * 0.16);
+      break;
+    case "fan":
+      c.moveTo(tx, 0);
+      c.quadraticCurveTo(tx - size * 1.5 * tailScale, -size * 1.5 * tailScale + sweep, tx - size * 1.9 * tailScale, sweep * 1.4);
+      c.quadraticCurveTo(tx - size * 1.5 * tailScale, size * 1.5 * tailScale + sweep, tx, 0);
+      break;
+    case "ribbon":
+      c.moveTo(tx, -size * 0.1);
+      c.quadraticCurveTo(tx - size * 1.2, sweep * 2, tx - size * 2.1, sweep * 2.6);
+      c.quadraticCurveTo(tx - size * 1.1, sweep * 1.2 + size * 0.1, tx, size * 0.12);
+      break;
+    default:
+      c.moveTo(tx, 0);
+      c.lineTo(tx - size * 0.78 * tailScale, -size * 0.52 * tailScale + sweep);
+      c.lineTo(tx - size * 0.78 * tailScale, size * 0.52 * tailScale + sweep);
+  }
   c.closePath();
   c.fill();
 
-  // A dorsal fin, which also gives the silhouette something to differ by.
+  // Dorsal. A perch carries a row of spines where a molly carries a sail, and
+  // that difference is most of what tells the two apart in silhouette.
+  if (form?.spiny) {
+    c.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const x = size * (0.42 - i * 0.19) * len;
+      c.moveTo(x, -halfDepth * 0.82);
+      c.lineTo(x + size * 0.05, -halfDepth - size * (form.dorsal) * 0.42);
+      c.lineTo(x + size * 0.12, -halfDepth * 0.82);
+    }
+    c.fill();
+  } else {
+    c.beginPath();
+    c.moveTo(size * 0.3 * len, -halfDepth * 0.75);
+    c.quadraticCurveTo(
+      -size * 0.1 * len, -halfDepth - size * (form?.dorsal ?? 0.75) * 0.62 - beat * size * 0.05,
+      -size * 0.55 * len, -halfDepth * 0.55);
+    c.closePath();
+    c.fill();
+  }
+
+  // Anal fin. Small, and the tank looks wrong without it once the dorsal varies.
   c.beginPath();
-  c.moveTo(size * 0.2, -size * 0.4);
-  c.lineTo(-size * 0.2, -size * 0.85 - beat * size * 0.08);
-  c.lineTo(-size * 0.5, -size * 0.35);
+  c.moveTo(-size * 0.05 * len, halfDepth * 0.7);
+  c.quadraticCurveTo(
+    -size * 0.4 * len, halfDepth + size * (form?.anal ?? 0.6) * 0.5 + beat * size * 0.04,
+    -size * 0.62 * len, halfDepth * 0.5);
   c.closePath();
   c.fill();
+
+  c.fillStyle = skin;
+  bodyPath();
+  c.fill();
+
+  // Markings, clipped to the body so a band runs off the edge of the flank
+  // rather than stopping short of it.
+  if (form && form.marks.length > 0 && !f.dead) {
+    c.save();
+    bodyPath();
+    c.clip();
+    for (const mark of form.marks) {
+      switch (mark.kind) {
+        case "band":
+          c.fillStyle = dark;
+          c.save();
+          c.translate(mark.x * size, 0);
+          c.rotate(mark.tilt);
+          c.fillRect(-size * 0.075, -halfDepth * 1.2, size * 0.15, halfDepth * 2.4);
+          c.restore();
+          break;
+        case "spot":
+          c.fillStyle = dark;
+          c.beginPath();
+          c.arc(mark.x * size, mark.y * size, mark.r * size, 0, Math.PI * 2);
+          c.fill();
+          break;
+        case "blob": {
+          c.fillStyle = pale;
+          const bx = mark.x * size;
+          const by = mark.y * size;
+          c.beginPath();
+          c.moveTo(bx, by);
+          for (const step of mark.steps) {
+            c.quadraticCurveTo(bx + step.cx * size, by + step.cy * size,
+                               bx + step.x * size, by + step.y * size);
+          }
+          c.fill();
+          break;
+        }
+        case "cloud": {
+          const cx = mark.x * size;
+          const cy = mark.y * size;
+          const gradient = c.createRadialGradient(cx, cy, 1, cx, cy, mark.r * size);
+          gradient.addColorStop(0, `hsla(${hue} ${sat}% 22% / 0.55)`);
+          gradient.addColorStop(1, `hsla(${hue} ${sat}% 22% / 0)`);
+          c.fillStyle = gradient;
+          c.fillRect(-size * len * 1.2, -halfDepth * 1.2, size * len * 2.4, halfDepth * 2.4);
+          break;
+        }
+        case "splash":
+          c.fillStyle = `hsla(${mark.hue} 78% 58% / 0.85)`;
+          c.beginPath();
+          c.ellipse(mark.x * size, mark.y * size, mark.rx * size, mark.ry * size,
+                    mark.rot, 0, Math.PI * 2);
+          c.fill();
+          break;
+      }
+    }
+    c.restore();
+  }
+
+  if (finish === "metal") {
+    c.save();
+    bodyPath();
+    c.clip();
+    c.fillStyle = `hsla(${hue} 90% 82% / 0.5)`;
+    c.fillRect(-size * len, -halfDepth * 0.55, size * len * 2, halfDepth * 0.3);
+    c.restore();
+  }
+  // Glass and ghost are nearly transparent, so without an edge they disappear
+  // against the backdrop entirely.
+  if (finish === "glass" || finish === "ghost") {
+    c.strokeStyle = `hsla(${hue} ${sat}% ${light + 10}% / 0.8)`;
+    c.lineWidth = Math.max(1, size * 0.035);
+    bodyPath();
+    c.stroke();
+  }
+
+  // The details that name a catfish.
+  if (form?.barbels || form?.feelers) {
+    c.strokeStyle = dark;
+    c.lineWidth = Math.max(1, size * 0.045);
+    if (form.barbels) {
+      for (const dir of [-1, 1]) {
+        c.beginPath();
+        c.moveTo(size * len * 0.86, size * 0.06);
+        c.quadraticCurveTo(size * len * 1.2, size * 0.16 * dir + beat * size * 0.05,
+                           size * len * 1.32, size * 0.34 * dir);
+        c.stroke();
+      }
+    }
+    if (form.feelers) {
+      c.beginPath();
+      c.moveTo(-size * 0.1, halfDepth * 0.8);
+      c.quadraticCurveTo(size * 0.5, halfDepth * 1.5 + beat * size * 0.1,
+                         size * len * 1.15, halfDepth * 1.1);
+      c.stroke();
+    }
+  }
+
   c.fillStyle = "#000";
   c.beginPath();
-  c.arc(size * 0.45, -size * 0.12, Math.max(1, size * 0.09), 0, Math.PI * 2);
+  c.arc(size * len * 0.6, -size * 0.06, Math.max(1, size * 0.085), 0, Math.PI * 2);
   c.fill();
-  c.restore();
 }
