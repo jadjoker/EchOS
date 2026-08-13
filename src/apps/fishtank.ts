@@ -13,18 +13,28 @@ import type { AppDef } from "./types.ts";
 import type { Agent, Influence } from "../core/influence.ts";
 import type { Rng } from "../core/rng.ts";
 import { appShell, button } from "./controls.ts";
-import { personName } from "../gen/places.ts";
 import { generateLore, loreWords, type FishLore } from "../gen/fishlore.ts";
 import { mountFish3d } from "./fish3d.ts";
+import { award } from "../core/achievements.ts";
+import tankFootage from "../assets/tank-vintage-scuba.mp4";
+import * as generated from "../gen/fishlore.generated.ts";
 
-const SPECIES_HEAD = `Golden Spotted Ribbon Paper Glass Blue Banded Dwarf Royal
-  Common Lesser Marbled Ghost Velvet Copper Whiptail Fantail Moon`.trim().split(/\s+/);
+const SPECIES_HEAD = [...`Golden Spotted Ribbon Paper Glass Blue Banded Dwarf Royal
+  Common Lesser Marbled Ghost Velvet Copper Whiptail Fantail Moon`.trim().split(/\s+/),
+  ...generated.SPECIES_HEAD];
 
-const SPECIES_TAIL = `barb tetra danio rasbora guppy molly platy loach gourami
-  cichlid catfish angelfish killifish minnow carp perch`.trim().split(/\s+/);
+const SPECIES_TAIL = [...`barb tetra danio rasbora guppy molly platy loach gourami
+  cichlid catfish angelfish killifish minnow carp perch`.trim().split(/\s+/),
+  ...generated.SPECIES_TAIL];
 
-const PET_NAMES = `Doug Marbles Biscuit Nelson Admiral Tiny Bubbles Kevin Pearl
-  Smudge Captain Jaws Gilbert Norman Sausage Duchess Rocket`.trim().split(/\s+/);
+/**
+ * A tank holds 4-8 fish drawn from this list, so its length is not decoration:
+ * at the seventeen names it shipped with, about two thirds of tanks contained
+ * two fish called the same thing.
+ */
+const PET_NAMES = [...`Doug Marbles Biscuit Nelson Admiral Tiny Bubbles Kevin Pearl
+  Smudge Captain Jaws Gilbert Norman Sausage Duchess Rocket`.trim().split(/\s+/),
+  ...generated.NAMES];
 
 /**
  * How an individual fish moves.
@@ -127,19 +137,60 @@ export const fishTankApp: AppDef = {
     caption.className = "tank-caption";
 
     const count = rng.int(4, 8);
+
+    /**
+     * Names are drawn without replacement, so no two fish in the tank answer to
+     * the same thing. Lengthening the list only ever made the collision rarer,
+     * never impossible: at 258 names and 8 fish it still lands about one tank
+     * in ten, which is often enough to notice and never often enough to debug.
+     *
+     * The pool starts with your collection's names already removed. Yours cannot
+     * be renamed — you bought them and they outlive the machine — so the
+     * machine's own fish are the ones that give way.
+     */
+    const namePool = PET_NAMES.filter(
+      (name) => !ctx.collection.fish.slice(0, ctx.collection.capacity)
+        .some((f) => f.name === name),
+    );
+
+    /** Exactly one roll per call, either branch, so seeds stay reproducible. */
+    function takeName(): string {
+      if (!namePool.length) return `${rng.pick(PET_NAMES)} II`;
+      const index = rng.int(0, namePool.length - 1);
+      return namePool.splice(index, 1)[0]!;
+    }
+
+    /**
+     * Very rarely, whoever had this machine before you left nothing alive.
+     *
+     * One boot in 250. It has to stay rare enough that the first person to hit
+     * it does not think it is the normal tank, and rare enough to be worth
+     * telling somebody the seed.
+     *
+     * Rolled on its own substream, so adding it shifts no other draw and every
+     * seed already shared still boots exactly the machine it did before.
+     *
+     * The machine's own fish only. Fish you bought are yours and travel
+     * between machines, so drowning them to land a joke would be deleting
+     * somebody's save. Your fish swim through the previous owner's graveyard,
+     * which is the better image anyway.
+     */
+    const graveyard = rng.derive("calamity").chance(0.004);
+    if (graveyard) award("all_my_fish_are_dead");
+
     const residents: Fish[] = Array.from({ length: count }, (_, i) => {
       const x = rng.range(0.1, 0.9);
       const y = rng.range(0.15, 0.85);
-      const lore = generateLore(rng, i === 0);
+      const lore = generateLore(rng, graveyard || i === 0);
       return {
         x, y,
         vx: rng.range(-0.0016, 0.0016) || 0.001,
         vy: rng.range(-0.0006, 0.0006),
         size: rng.range(0.05, 0.11),
         hue: rng.int(0, 359),
-        name: rng.pick(PET_NAMES),
+        name: takeName(),
         species: `${rng.pick(SPECIES_HEAD)} ${rng.pick(SPECIES_TAIL)}`,
-        dead: i === 0,
+        dead: graveyard || i === 0,
         lore,
         swim: swimFor(rng, lore.temperament, x, y),
       };
@@ -173,7 +224,11 @@ export const fishTankApp: AppDef = {
             vy: rng.range(-0.0006, 0.0006),
             size: f.size, hue: f.hue,
             name: f.name, species: f.species,
-            dead: false, lore: f.lore, mine: true, collectionId: f.id,
+            // On a graveyard machine yours float too, so the joke actually
+            // lands. Nothing is written back: this is a property of the tank
+            // you are standing in, not of the fish, and the collection on disk
+            // never hears about it. Boot another machine and they are fine.
+            dead: graveyard, lore: f.lore, mine: true, collectionId: f.id,
             swim: swimFor(rng, f.lore.temperament, rng.range(0.2, 0.8), y),
           };
         });
@@ -185,28 +240,22 @@ export const fishTankApp: AppDef = {
 
     let guests: Fish[] = [];
     let arriving: Influence | null = null;
-    const keeper = personName(rng);
 
     /** Flakes drifting down after a feed. */
     const flakes: { x: number; y: number; vy: number }[] = [];
 
+    /**
+     * How many fish, and nothing else.
+     *
+     * This line used to carry the keeper's name, the flake count, how many were
+     * yours, how many were kept, and every piece of fitted equipment. All of it
+     * was true and none of it was asked for — a status bar stacked under a
+     * title that already said what the window was.
+     */
     function updateCaption(): void {
-      const extra = guests.length ? ` · ${guests.length} visitors` : "";
-      const yours = owned.length ? ` · ${owned.length} yours` : "";
-      const tin = ctx.collection.food > 0 ? ` · ${ctx.collection.food} feeds` : " · no flake";
-      // Total, not the machine's own count — "8 fish · 2 yours" otherwise reads
-      // as two of the eight rather than two on top of them.
-      const total = count + owned.length;
-
-      // Fitted equipment is listed so a purchase is legible even before you
-      // notice what it changed.
-      const fitted = (["heater", "lamp", "castle", "annexe", "conservatory"] as const)
-        .filter((id) => ctx.collection.has(id));
-      const kit = fitted.length ? ` · ${fitted.join(", ")}` : "";
-
-      caption.textContent =
-        `${total} fish${yours}${extra} · ${ctx.collection.fish.length}/${ctx.collection.capacity} kept` +
-        ` · ${keeper}${tin}${kit}`;
+      // Total, not the machine's own count: fish you brought are in the tank
+      // and visibly swimming, so a number that excluded them would be wrong.
+      caption.textContent = `${count + owned.length} fish`;
     }
     syncOwned();
 
@@ -230,6 +279,10 @@ export const fishTankApp: AppDef = {
         }
         updateCaption();
         ctx.nudge("tinker");
+      }),
+      button("Fish", () => {
+        openFishPanel();
+        ctx.nudge("inspect");
       }),
       caption,
     );
@@ -262,6 +315,59 @@ export const fishTankApp: AppDef = {
       ctx.nudge("inspect");
     });
 
+    /**
+     * Everyone in the tank, as a list you can read.
+     *
+     * The tank is the real interface and this does not replace it: the point of
+     * the aquarium is watching. But finding one particular fish by waiting for
+     * it to swim past is a game nobody asked to play, and a dead one never
+     * swims past at all.
+     *
+     * Residents and yours only. Visitors arriving over the bus are foreign
+     * agents wearing fish shapes, with no lore behind them, so a row for one
+     * would open nothing.
+     */
+    function openFishPanel(): void {
+      const list = document.createElement("div");
+      list.className = "fish-panel";
+      const models: { stop(): void }[] = [];
+
+      for (const fish of [...residents, ...owned]) {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "fish-row";
+
+        const bust = document.createElement("div");
+        bust.className = "fish-row-model";
+        models.push(mountFish3d(bust, { hue: fish.hue, deceased: fish.dead }));
+
+        const name = document.createElement("span");
+        name.className = "fish-row-name";
+        name.textContent = fish.name;
+
+        const note = document.createElement("span");
+        note.className = "fish-row-note";
+        note.textContent = fish.dead ? "deceased" : fish.mine ? "yours" : fish.species;
+
+        row.append(bust, name, note);
+        row.addEventListener("click", () => {
+          openProfile(fish);
+          ctx.nudge("inspect");
+        });
+        list.append(row);
+      }
+
+      ctx.openWindow({
+        title: "Fish",
+        body: list,
+        width: 260,
+        height: 300,
+        // Every row owns a running animation loop. Without this they keep
+        // turning in a window nobody can see.
+        onClose: () => { for (const model of models) model.stop(); },
+      });
+    }
+
     function openProfile(fish: Fish): void {
       if (!fish.lore) return;
       openProfiles.add(fish);
@@ -270,9 +376,8 @@ export const fishTankApp: AppDef = {
       ctx.openWindow({
         title: fish.name,
         body,
-        width: 300,
-        height: 340,
-        resizable: false,
+        ...fitToContent(body, 300),
+        resizable: true,
         onClose: () => {
           dispose();
           openProfiles.delete(fish);
@@ -281,6 +386,120 @@ export const fishTankApp: AppDef = {
     }
 
     let frame = 0;
+
+    /**
+     * The backdrop: real footage, behind everything the tank draws.
+     *
+     * Drawn into the canvas as the base layer rather than sat behind it as a
+     * DOM element, because every effect the tank already has is painted in
+     * order on top of this one fill: the borrowed hue from whatever is plugged
+     * in, the cold water wash, the lamp you can buy, the gravel. Putting the
+     * video underneath the canvas would have meant reimplementing all of that
+     * in CSS, and the lamp would have stopped being worth 190 coins.
+     *
+     * Muted and inline, so it autoplays without a gesture.
+     */
+    const backdrop = document.createElement("video");
+    backdrop.className = "tank-footage";
+    backdrop.muted = true;
+    backdrop.loop = true;
+    backdrop.playsInline = true;
+    backdrop.preload = "auto";
+
+    /**
+     * Each machine gets its own stretch of the reel.
+     *
+     * Playing the whole thing start to finish would make every tank identical
+     * once you had seen it twice. The offset is seeded, so a shared seed still
+     * reproduces the same tank down to which divers are in it.
+     */
+    const segmentRng = rng.derive("backdrop");
+    let segmentStart = 0;
+    const SEGMENT_SECONDS = 24;
+
+    function chooseSegment(): void {
+      const usable = Math.max(0, backdrop.duration - SEGMENT_SECONDS);
+      segmentStart = Number.isFinite(usable) ? segmentRng.range(0, usable) : 0;
+      backdrop.currentTime = segmentStart;
+    }
+
+    // Registered before src is set, and checked again straight after. A warm
+    // cache can have metadata ready before a listener added afterwards ever
+    // runs, which is how this silently played from the top instead.
+    backdrop.addEventListener("loadedmetadata", chooseSegment);
+
+    // loop alone would run to the end of the file. This keeps it on its own
+    // stretch instead.
+    backdrop.addEventListener("timeupdate", () => {
+      if (backdrop.currentTime > segmentStart + SEGMENT_SECONDS) {
+        backdrop.currentTime = segmentStart;
+      }
+    });
+
+    backdrop.src = tankFootage;
+    // Kept in the document, one pixel and invisible, rather than orphaned.
+    // Detached media elements are not reliably allowed to play, and this is
+    // never looked at directly: it exists to be sampled by drawImage.
+    stage.append(backdrop);
+    if (backdrop.readyState >= 1) chooseSegment();
+
+    /**
+     * Keep it playing, and keep trying.
+     *
+     * One call at startup was not enough, and the reason is worth writing down
+     * because it looked like flakiness: asking to play and then seeking to the
+     * machine's segment aborts the pending play, the rejection is silent, and
+     * nothing ever asked again. The tank sat on a single frozen frame at
+     * exactly its start offset. It was not intermittent, it only looked that
+     * way, because a warm cache changes which of the two happens first.
+     *
+     * So this is called from every event that could plausibly leave it stopped,
+     * and again from the draw loop as a backstop. A backdrop that quietly stops
+     * is worse than one that never started, since nothing on screen says why.
+     */
+    function ensurePlaying(): void {
+      if (!backdrop.paused || !backdrop.isConnected || backdrop.readyState < 2) return;
+      void backdrop.play().catch(() => {
+        // Refused for now. The tank falls back to its painted water, which is
+        // what it always was, and the draw loop will ask again shortly.
+      });
+    }
+    for (const event of ["loadeddata", "canplay", "seeked", "stalled", "suspend"]) {
+      backdrop.addEventListener(event, ensurePlaying);
+    }
+    ensurePlaying();
+    document.addEventListener("visibilitychange", ensurePlaying);
+
+    /** Throttle for the backstop, so a refusal is not retried every frame. */
+    let lastPlayAttempt = 0;
+
+    /**
+     * Cover, not contain. The footage is a fixed shape and the window is not,
+     * so something has to give: stretching distorts people, and letterboxing
+     * reads as a bug. Cropping the overflow is the only one of the three that
+     * looks deliberate.
+     */
+    function drawBackdrop(c: CanvasRenderingContext2D, w: number, h: number): boolean {
+      const vw = backdrop.videoWidth;
+      const vh = backdrop.videoHeight;
+      if (!vw || !vh || backdrop.readyState < 2) return false;
+
+      // The backstop. Anything that stopped playback without telling us gets
+      // undone within a second, whatever the cause was.
+      if (backdrop.paused) {
+        const now = performance.now();
+        if (now - lastPlayAttempt > 900) {
+          lastPlayAttempt = now;
+          ensurePlaying();
+        }
+      }
+
+      const scale = Math.max(w / vw, h / vh);
+      const dw = vw * scale;
+      const dh = vh * scale;
+      c.drawImage(backdrop, (w - dw) / 2, (h - dh) / 2, dw, dh);
+      return true;
+    }
 
     const token = (name: string) =>
       getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -307,8 +526,12 @@ export const fishTankApp: AppDef = {
         ? Math.abs(live.rhythm[Math.floor(time / 60) % live.rhythm.length] ?? 0)
         : 0;
 
-      c.fillStyle = token("--c-boot-bg") || "#04121a";
-      c.fillRect(0, 0, w, h);
+      // Painted water is the fallback, not the default: it is what you get
+      // while the footage is still buffering, and if the file never arrives.
+      if (!drawBackdrop(c, w, h)) {
+        c.fillStyle = token("--c-boot-bg") || "#04121a";
+        c.fillRect(0, 0, w, h);
+      }
       // Borrowed hues tint the water, so a connection is visible at a glance.
       const tint = live.palette[0];
       if (tint !== undefined) {
@@ -481,6 +704,13 @@ export const fishTankApp: AppDef = {
       dispose: () => {
         cancelAnimationFrame(frame);
         offCollection();
+        // Closing the window has to stop the decoder too. A paused video with
+        // its src cleared is the only way to be sure it is not still being
+        // decoded for a canvas nobody is drawing.
+        document.removeEventListener("visibilitychange", ensurePlaying);
+        backdrop.pause();
+        backdrop.removeAttribute("src");
+        backdrop.load();
       },
       node: {
         id: ctx.id,
@@ -583,6 +813,41 @@ function drawCastle(c: CanvasRenderingContext2D, w: number, h: number, colour: s
   c.fill();
 }
 
+/**
+ * How big a window has to be for a card to fit in it.
+ *
+ * Profiles vary: a fish with three likes, a long quote and a keeper's name
+ * needs noticeably more room than one whose record was never finished, and a
+ * fixed height meant the first was scrolled and the second was mostly padding.
+ *
+ * Measured off-screen at the width the window will actually use, wearing the
+ * same class as the real window body so it wraps identically. The titlebar is
+ * measured from a real one rather than guessed, since window height includes
+ * the chrome.
+ */
+function fitToContent(body: HTMLElement, width: number): { width: number; height: number } {
+  const probe = document.createElement("div");
+  probe.className = "win-body";
+  probe.style.cssText =
+    `position:absolute; left:-9999px; top:0; visibility:hidden; width:${width}px;`;
+  probe.append(body);
+  document.body.append(probe);
+  const content = Math.ceil(body.getBoundingClientRect().height);
+  probe.remove();
+
+  const chrome = document.querySelector(".win-titlebar")?.getBoundingClientRect().height ?? 26;
+
+  return {
+    width,
+    // Clamped at both ends: a fish with an enormous quote must not open taller
+    // than the screen, and a nearly empty record should still look like a card
+    // rather than a strip.
+    height: Math.round(
+      Math.max(240, Math.min(content + chrome + 2, window.innerHeight * 0.8)),
+    ),
+  };
+}
+
 /** The profile window's contents, plus a teardown for its animation loop. */
 function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose: () => void } {
   const root = document.createElement("div");
@@ -598,7 +863,10 @@ function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose:
 
   const species = document.createElement("div");
   species.className = "profile-species";
-  species.textContent = lore.deceased
+  // The tank is the truth here, not the stored lore. A fish of yours floating
+  // in a graveyard machine is deceased for as long as you are in that machine,
+  // whatever its saved record says.
+  species.textContent = fish.dead
     ? `${fish.species} · deceased`
     : fish.mine
       ? `${fish.species} · ${lore.temperament} · yours`
@@ -606,7 +874,14 @@ function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose:
 
   const rows = document.createElement("dl");
   rows.className = "profile-rows";
+  /**
+   * An empty row is omitted rather than left blank. Lore restored from an old
+   * or hand-edited save can be missing fields (see repairLore in
+   * core/collection.ts), and "Likes:" with nothing after it reads as a bug,
+   * where a card that simply lacks that line reads as a record nobody finished.
+   */
   const row = (label: string, value: string) => {
+    if (!value) return;
     const dt = document.createElement("dt");
     dt.textContent = label;
     const dd = document.createElement("dd");
@@ -619,15 +894,21 @@ function buildProfile(fish: Fish, lore: FishLore): { body: HTMLElement; dispose:
   row("Dislikes", lore.dislikes.join(", "));
   row("From", lore.acquired);
 
-  const quote = document.createElement("blockquote");
-  quote.className = "profile-quote";
-  quote.textContent = lore.quote;
+  root.append(stage, name, species, rows);
 
-  const credit = document.createElement("div");
-  credit.className = "profile-credit";
-  credit.textContent = `Recorded by ${lore.recordedBy}`;
+  if (lore.quote) {
+    const quote = document.createElement("blockquote");
+    quote.className = "profile-quote";
+    quote.textContent = lore.quote;
+    root.append(quote);
+  }
 
-  root.append(stage, name, species, rows, quote, credit);
+  if (lore.recordedBy && lore.recordedBy !== "nobody") {
+    const credit = document.createElement("div");
+    credit.className = "profile-credit";
+    credit.textContent = `Recorded by ${lore.recordedBy}`;
+    root.append(credit);
+  }
   return { body: root, dispose: () => model.stop() };
 }
 

@@ -784,6 +784,16 @@ body.is-patching .cable {
   height: 100%;
 }
 
+/* The backdrop reel. Present so it is allowed to decode and play, never looked
+   at directly: the tank canvas samples it with drawImage every frame. */
+.tank-footage {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .tank-caption {
   font-size: var(--size-small);
   color: var(--c-ink-muted);
