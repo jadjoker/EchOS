@@ -22,9 +22,33 @@ import type { Rng } from "../core/rng.ts";
 
 type Vec3 = readonly [number, number, number];
 
+/**
+ * How one face is coloured, relative to the object's base hue.
+ *
+ * Relative rather than absolute so a composed object stays inside the
+ * machine's palette: a castle's roof is "150 degrees round from whatever the
+ * accent is", not "terracotta". The machine decides the colour, the object
+ * decides the relationship.
+ */
+export interface FaceTint {
+  /** Degrees from the object's base hue. */
+  hue: number;
+  /** Absolute saturation, 0-100. */
+  sat: number;
+  /** Multiplies the lit lightness, so shading still comes from the geometry. */
+  light: number;
+}
+
 export interface Mesh {
   vertices: Vec3[];
   faces: readonly (readonly [number, number, number])[];
+  /**
+   * Per-face colour, parallel to `faces`. Absent for a plain lathed solid,
+   * which is one material all over; present for anything built from parts,
+   * where a roof being the same colour as its walls is what stops it reading
+   * as a lump.
+   */
+  tints?: readonly FaceTint[];
 }
 
 /**
@@ -280,13 +304,13 @@ export function mountSolid(host: HTMLElement, options: SolidOptions): { stop(): 
       };
     });
 
-    const faces = options.mesh.faces.map((face) => {
+    const faces = options.mesh.faces.map((face, index) => {
       const a = projected[face[0]]!;
       const b = projected[face[1]]!;
       const c = projected[face[2]]!;
       const n = normal(a.world, b.world, c.world);
       const lit = Math.max(0, n[0] * LIGHT[0] + n[1] * LIGHT[1] + n[2] * LIGHT[2]);
-      return { a, b, c, depth: (a.z + b.z + c.z) / 3, lit };
+      return { a, b, c, depth: (a.z + b.z + c.z) / 3, lit, tint: options.mesh.tints?.[index] };
     });
 
     // Painter's algorithm, as with the fish. A depth buffer for a hundred
@@ -294,7 +318,10 @@ export function mountSolid(host: HTMLElement, options: SolidOptions): { stop(): 
     faces.sort((p, q) => p.depth - q.depth);
 
     for (const f of faces) {
-      bc.fillStyle = `hsl(${options.hue} 48% ${24 + f.lit * 54}%)`;
+      const shade = 24 + f.lit * 54;
+      bc.fillStyle = f.tint
+        ? `hsl(${(options.hue + f.tint.hue + 360) % 360} ${f.tint.sat}% ${Math.min(94, shade * f.tint.light)}%)`
+        : `hsl(${options.hue} 48% ${shade}%)`;
       bc.beginPath();
       bc.moveTo(f.a.x, f.a.y);
       bc.lineTo(f.b.x, f.b.y);
