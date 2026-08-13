@@ -827,17 +827,52 @@ body.is-patching .cable {
   color: var(--c-ink-muted);
 }
 
+/* A card with the goods in it, rather than a line in a price list. */
 .shop-item {
   display: flex;
   gap: var(--window-pad);
   align-items: center;
   padding: calc(var(--window-pad) / 2);
-  border-bottom: var(--border-width) var(--border-style) var(--c-surface-alt);
+  margin-bottom: calc(var(--window-pad) / 2);
+  background: var(--c-surface);
+  border: var(--border-width) var(--border-style) var(--c-surface-alt);
+  border-radius: var(--radius-control);
 }
 
 .shop-item.is-sold,
 .shop-item.is-owned {
   opacity: 0.5;
+}
+
+/*
+ * The well the model turns in. Sunk rather than flat, so the object reads as
+ * sitting in the shelf instead of floating on the card, and fixed square at
+ * both axes because the renderers measure their host to size themselves and a
+ * well that collapsed would size them to nothing.
+ */
+.shop-item-model {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /*
+   * Both renderers draw into a 64px buffer and scale it up with smoothing off.
+   * A well smaller than that is downscaling, which throws away the chunky
+   * pixels that are the entire reason they draw small in the first place.
+   */
+  width: 5.8em;
+  height: 5.8em;
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  overflow: hidden;
+}
+
+.shop-item-model canvas {
+  width: 100%;
+  height: 100%;
+  /* The whole point of drawing at 64 pixels is that you can see them. */
+  image-rendering: pixelated;
 }
 
 .shop-item-text {

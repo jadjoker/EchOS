@@ -17,6 +17,10 @@ import type { OwnedFish, UpgradeId } from "../core/collection.ts";
 import type { Rng } from "../core/rng.ts";
 import { formatCoins } from "../core/economy.ts";
 import { generateLore } from "../gen/fishlore.ts";
+import { mountSolid } from "../gen/solid.ts";
+import { GOODS } from "../gen/goods.ts";
+import { tokenHsl } from "../theme/color.ts";
+import { mountFish3d } from "./fish3d.ts";
 import { appShell } from "./controls.ts";
 
 const SPECIES_HEAD = `Golden Spotted Ribbon Paper Glass Blue Banded Dwarf Royal
@@ -49,6 +53,24 @@ const UPGRADES: UpgradeOffer[] = [
   { id: "conservatory", label: "Conservatory", price: 900,
     blurb: "Room for four more on top of the annexe. Absurd, and you will want it." },
 ];
+
+/**
+ * How far round from the machine's accent each thing on the shelf sits.
+ *
+ * The objects themselves are in `gen/goods.ts`. Only the hue lives here,
+ * because it is the one part of them that belongs to the machine rather than
+ * to the product: a fixed colour would make the shelf the one thing on screen
+ * that did not change when you rebooted.
+ */
+const PRODUCT_HUE: Record<string, number> = {
+  egg: -28,
+  flake: 94,
+  heater: 0,
+  lamp: 44,
+  castle: 178,
+  annexe: 22,
+  conservatory: 200,
+};
 
 /** A shelf row that owns its element and knows how to update it in place. */
 interface Row {
@@ -98,10 +120,13 @@ export const shopApp: AppDef = {
   id: "shop",
   title: "Aquatics",
   glyph: "🛒",
-  width: 380,
-  height: 420,
-  minWidth: 300,
-  minHeight: 260,
+  // Bigger than it was, in both directions. The cards carry an object each
+  // now, and at the old width the blurbs wrapped to four lines beside the
+  // model, which made a card tall enough that three filled the window.
+  width: 460,
+  height: 540,
+  minWidth: 360,
+  minHeight: 300,
 
   create(ctx) {
     const { root, controls, stage } = appShell();
@@ -210,12 +235,57 @@ export const shopApp: AppDef = {
       say(`${upgrade.label} fitted.`);
     }
 
+    /**
+     * Every model the shelf is running, so they can all be stopped at once.
+     *
+     * Each one owns a requestAnimationFrame loop that does not know the window
+     * exists. Closing the shop without this leaves the whole shelf turning in
+     * a detached node for the rest of the session.
+     */
+    const models: { stop(): void }[] = [];
+
+    /** The accent as the machine currently has it, for everything drawn here. */
+    const accentHue = tokenHsl("--c-accent", "#3355aa").h;
+
+    /**
+     * A well with the goods turning in it.
+     *
+     * Livestock uses the fish renderer, so what spins is the actual fish being
+     * sold, in its own colour, and can be picked up and turned over the way the
+     * ones in the tank can. Everything else is a lathed solid from the table
+     * above.
+     */
+    function productWell(kind: { fishHue: number } | { product: string }): HTMLElement {
+      const well = document.createElement("div");
+      well.className = "shop-item-model";
+
+      if ("fishHue" in kind) {
+        models.push(mountFish3d(well, { hue: kind.fishHue, deceased: false }));
+        return well;
+      }
+
+      const build = GOODS[kind.product];
+      if (!build) return well;
+      models.push(mountSolid(well, {
+        mesh: build(),
+        hue: (Math.round(accentHue) + (PRODUCT_HUE[kind.product] ?? 0) + 360) % 360,
+        // Quicker than the figures on a web page, which are background: here
+        // the object is what you came to look at.
+        spin: 0.013,
+        // Looked at from slightly above, which is where you would be standing.
+        // Dead-on from the equator hides the lid of the tin and the roofs.
+        tilt: 0.34,
+      }));
+      return well;
+    }
+
     function itemRow(
       title: string,
       price: number,
       action: () => void,
       detailNow: () => string,
       stateNow: () => "" | "sold" | "owned",
+      well: HTMLElement,
     ): Row {
       const row = document.createElement("div");
       row.className = "shop-item";
@@ -238,7 +308,7 @@ export const shopApp: AppDef = {
       // .click() is synchronous and never noticed.
       buy.addEventListener("click", action);
 
-      row.append(text, buy);
+      row.append(well, text, buy);
 
       return {
         el: row,
@@ -275,18 +345,20 @@ export const shopApp: AppDef = {
     list.append(section("Livestock"));
     for (const offer of offers) {
       const row = itemRow(
-        `${offer.name} — ${offer.species}`,
+        offer.name,
         offer.price,
         () => buyFish(offer),
-        () => offer.note,
+        () => `${offer.species} · ${offer.note}`,
         () => (sold.has(offer.key) ? "sold" : ""),
+        productWell({ fishHue: offer.hue }),
       );
       rows.push(row);
       list.append(row.el);
     }
     {
       const row = itemRow("Unmarked egg", 70, buyEgg,
-        () => "Nobody is certain what is in it.", () => "");
+        () => "Nobody is certain what is in it.", () => "",
+        productWell({ product: "egg" }));
       rows.push(row);
       list.append(row.el);
     }
@@ -295,7 +367,8 @@ export const shopApp: AppDef = {
     {
       const row = itemRow("Tin of flake", 20, buyFood,
         () => (ctx.collection.food > 0 ? `${ctx.collection.food} feeds left` : "Ten feeds"),
-        () => "");
+        () => "",
+        productWell({ product: "flake" }));
       rows.push(row);
       list.append(row.el);
     }
@@ -304,7 +377,8 @@ export const shopApp: AppDef = {
     for (const upgrade of UPGRADES) {
       const row = itemRow(upgrade.label, upgrade.price, () => buyUpgrade(upgrade),
         () => upgrade.blurb,
-        () => (ctx.collection.has(upgrade.id) ? "owned" : ""));
+        () => (ctx.collection.has(upgrade.id) ? "owned" : ""),
+        productWell({ product: upgrade.id }));
       rows.push(row);
       list.append(row.el);
     }
@@ -329,6 +403,7 @@ export const shopApp: AppDef = {
         offEconomy();
         offCollection();
         clearTimeout(flashTimer);
+        for (const model of models) model.stop();
       },
       node: {
         id: ctx.id,
