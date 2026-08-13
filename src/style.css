@@ -1475,6 +1475,17 @@ body.is-patching .cable {
   height: 130px;
   background-repeat: repeat;
   border: var(--border-width) var(--border-style) var(--c-line);
+  /* The generated object sits on the tile, centred in the frame. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-solid {
+  display: block;
+  /* Same nearest-neighbour treatment as the aquarium's fish. The chunk is
+     the period detail; a smooth model would read as a modern page. */
+  image-rendering: pixelated;
 }
 
 .site-figure-caption {

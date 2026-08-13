@@ -14,6 +14,7 @@
  */
 
 import { lookup, type Category } from "./lexicon.ts";
+import { GENERATED } from "./properties.generated.ts";
 
 export type Scale = "tiny" | "small" | "medium" | "large" | "huge";
 
@@ -270,10 +271,23 @@ const BY_CATEGORY: Partial<Record<Category, Partial<Props>>> = {
   },
 };
 
+/**
+ * Four layers, each beating the one before it: the blank fallback, the category,
+ * the generated per-word table, and finally anything authored by hand.
+ *
+ * Hand-authored wins outright. The generated table is bulk work from a build-time
+ * pass (tools/expand-props.mjs) and is right most of the time; OVERRIDES is where
+ * a word gets corrected or given a better ear, and that correction must survive
+ * the next regeneration.
+ */
 export function propsFor(word: string, category?: Category): Props {
   const resolved = category ?? lookup(word) ?? "abstract";
-  const override = OVERRIDES[word];
-  return { ...BLANK, ...BY_CATEGORY[resolved], ...override };
+  return {
+    ...BLANK,
+    ...BY_CATEGORY[resolved],
+    ...GENERATED[word],
+    ...OVERRIDES[word],
+  };
 }
 
 /**

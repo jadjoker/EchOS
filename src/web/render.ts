@@ -12,6 +12,7 @@ import { generateTheme } from "../theme/generate.ts";
 import { generateTile } from "../theme/texture.ts";
 import { rgbToHsl } from "../theme/color.ts";
 import type { Block, Page } from "./site.ts";
+import { makeSolid, mountSolid, type SolidShape } from "../gen/solid.ts";
 
 export interface RenderOptions {
   onNavigate(domain: string): void;
@@ -66,7 +67,7 @@ export function renderPage(page: Page, rng: Rng, options: RenderOptions): HTMLEl
   };
 
   for (const block of page.blocks) {
-    root.append(renderBlock(block, rng, palette, options));
+    root.append(renderBlock(block, rng, palette, options, page.solid));
   }
   return root;
 }
@@ -76,6 +77,7 @@ function renderBlock(
   rng: Rng,
   palette: { bg: ReturnType<typeof hex>; fg: ReturnType<typeof hex>; accent: ReturnType<typeof hex> },
   options: RenderOptions,
+  solid: SolidShape,
 ): HTMLElement {
   switch (block.kind) {
     case "banner": {
@@ -191,7 +193,17 @@ function renderBlock(
     case "figure": {
       const wrap = el("figure", "site-figure");
       const image = el("div", "site-figure-image");
+      // The tile stays, as the backdrop. A flat-shaded object floating on a
+      // patterned ground is not a compromise between the two — it is precisely
+      // what a 1996 page did with the render it was proud of.
       image.style.backgroundImage = generateTile(rng, block.tile, palette);
+      mountSolid(image, {
+        mesh: makeSolid(rng.derive(`solid:${block.caption}`), solid),
+        hue: Math.round(palette.accent.h),
+        // Slow. A figure that spins at reading speed pulls the eye off the page.
+        spin: 0.006,
+        tilt: 0.42,
+      });
       wrap.append(image, el("figcaption", "site-figure-caption", block.caption));
       return wrap;
     }
