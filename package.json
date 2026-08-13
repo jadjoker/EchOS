@@ -3,13 +3,20 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "main": "electron/main.cjs",
   "scripts": {
+    "desktop": "npm run build && electron .",
+    "desktop:dev": "electron . --dev",
+    "desktop:debug": "npm run build && electron . --remote-debugging-port=9222",
+    "start": "vite --open",
+    "hnp": "node tools/hnp.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "check": "tsc --noEmit"
   },
   "devDependencies": {
+    "electron": "^43.4.0",
     "typescript": "^5.7.2",
     "vite": "^6.0.7"
   }

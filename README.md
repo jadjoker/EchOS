@@ -12,16 +12,46 @@ in a URL or a search box. The wordmark should render the **O once**, shared
 between both words, so the logo teaches the joke without a caption.
 
 Design doc: `C:\Users\smitt\.claude\plans\game-where-each-time-linear-reef.md`
-Issue tracker: `https://jadjoker.atlassian.net` — project **ECHOS**
+Issue tracker: HacknPlan. Read it from here with `node tools/hnp.mjs board <projectId>`.
 
-## Running it
+## What this ships as
+
+**A Steam application.** The browser is the development surface, not a product:
+there is no free web build feeding a paid one, and nothing is designed around
+being embeddable, linkable or shareable-by-URL any more.
 
 ```bash
-npm install
-npm run dev
+npm run desktop       # build, then run it as the real application
+npm run desktop:dev   # same window, pointed at a running `npm run dev`
 ```
 
-`npm run check` typechecks without emitting.
+`electron/main.cjs` is the whole shell and is deliberately thin: no game logic,
+no generation, no window management. Those live inside the machine, which has
+its own. The renderer runs sandboxed with no Node access, and navigation and
+window-opening are both denied, because this game renders arbitrary generated
+content by design and none of it should be able to reach the disk or the
+outside.
+
+Not done yet: no installer or packaging step, no Steamworks integration, and
+the Steam overlay's behaviour with Electron is still the one unresolved bet in
+the stack. Achievements need an app ID before any of that can be written.
+
+**Double-click `play.cmd`** to play it. That builds and launches the real
+application, and is the same thing as `npm run desktop`.
+
+## Running it in a browser
+
+For development the browser is the faster loop: changes reload instantly and
+the dev tools are there. It is not the product.
+
+**Double-click `dev-browser.cmd`**, or from a terminal:
+
+```bash
+npm start
+```
+
+`npm run dev` is the identical server without opening a browser, for when one
+is already pointed at the page. `npm run check` typechecks without emitting.
 
 A seed in the URL boots that exact machine: `?seed=7141-ESTUARY`. Without one you
 get a new machine every load — the seed is deliberately *not* written back to the
@@ -139,7 +169,10 @@ unanswered: **is connecting things fun?** It can only be answered by playing.
 ## The two rules that matter
 
 **Everything generated derives from `core/rng.ts`.** If a seed doesn't reproduce
-a machine exactly, seed sharing dies, and seed sharing is the marketing engine.
+a machine exactly, seed sharing dies. That used to matter because a free web
+build was meant to feed the paid one; it now matters because a machine you can
+hand to somebody else is the only way this game gets talked about, and because
+"the same seed, the same machine" is the promise the whole thing rests on.
 Use `rng.derive("namespace")` for each subsystem so adding a generator later
 doesn't shift every downstream roll and invalidate seeds people have shared.
 
@@ -167,16 +200,15 @@ src/
 
 ## Not done yet
 
-Archetype expansion is the known gap (ECHOS-22 part B) — ten archetypes means
-pages start rhyming after a dozen or so, even now that layout varies.
+Archetype expansion is the known gap — ten archetypes means pages start rhyming
+after a dozen or so, even now that layout varies.
 
 No generated cursors, wallpapers-with-imagery, or sound. No decorative junk
 beyond marquees and hit counters — no under-construction GIFs, webring badges or
 custom pointers, which is where a lot of the amateur-web character actually
 lives.
 
-The points economy (ECHOS-9, ECHOS-13) is parked pending a decision, not
-forgotten.
+The points economy is parked pending a decision, not forgotten.
 
 The values in `theme/tokens.css` are only a fallback for before the generator
 runs — not a house style.
