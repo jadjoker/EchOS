@@ -906,6 +906,68 @@ body.is-patching .cable {
   display: block;
   /* Nearest-neighbour on the way up — the chunky pixels are the point. */
   image-rendering: pixelated;
+  /* It can be grabbed and turned, so it has to look like it can. */
+  cursor: grab;
+  /* Without this a drag scrolls the window on a touchscreen instead. */
+  touch-action: none;
+}
+
+.fish3d:active {
+  cursor: grabbing;
+}
+
+.fish-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--window-pad);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.fish-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  font: inherit;
+  color: var(--c-ink);
+  text-align: left;
+  background: none;
+  border: var(--border-width) var(--border-style) transparent;
+  cursor: pointer;
+}
+
+.fish-row:hover,
+.fish-row:focus-visible {
+  border-color: var(--c-line);
+  background: var(--c-surface-alt);
+}
+
+.fish-row-model {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+}
+
+/* The model here is a thumbnail, not a toy. Turning it is what the profile
+   window is for, and a drag inside a list row would fight the click. */
+.fish-row-model .fish3d {
+  pointer-events: none;
+  cursor: inherit;
+}
+
+.fish-row-name {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fish-row-note {
+  flex: 0 0 auto;
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
 }
 
 .profile-name {

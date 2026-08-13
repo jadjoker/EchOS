@@ -66,13 +66,24 @@ interface FishOffer {
   note: string;
 }
 
-/** Priced by how unusual the roll was, so a rare-looking fish costs more. */
-function makeFishOffer(rng: Rng, index: number): FishOffer {
+/**
+ * Priced by how unusual the roll was, so a rare-looking fish costs more.
+ *
+ * `taken` is the set of names already spoken for — your collection, plus
+ * whatever else is on the shelf — and is added to as offers are made. The tank
+ * is where a duplicate would actually show up, but the shop is where it gets
+ * created, and a fish you own can never be renamed to fix it later.
+ */
+function makeFishOffer(rng: Rng, index: number, taken: Set<string>): FishOffer {
   const rare = rng.chance(0.25);
   const size = rng.range(0.05, rare ? 0.14 : 0.1);
+  const free = STOCK_NAMES.filter((candidate) => !taken.has(candidate));
+  // A shelf with nothing new to call anything is better than no shelf at all.
+  const name = rng.pick(free.length ? free : STOCK_NAMES);
+  taken.add(name);
   return {
     key: `offer-${index}`,
-    name: rng.pick(STOCK_NAMES),
+    name,
     species: `${rng.pick(SPECIES_HEAD)} ${rng.pick(SPECIES_TAIL)}`,
     hue: rng.int(0, 359),
     size,
@@ -109,8 +120,11 @@ export const shopApp: AppDef = {
     // Stock is seeded from the machine, so it is the same shelf all session and
     // a different shelf on the next boot.
     const stockRng = ctx.rng.derive("stock");
+    // Shared across the shelf, so no two offers are called the same thing
+    // either — seeded with what you already own.
+    const stocked = new Set(ctx.collection.fish.map((f) => f.name));
     const offers = Array.from({ length: stockRng.int(2, 4) }, (_, i) =>
-      makeFishOffer(stockRng, i));
+      makeFishOffer(stockRng, i, stocked));
     const sold = new Set<string>();
 
     let flash = "";
@@ -160,7 +174,7 @@ export const shopApp: AppDef = {
       }
       // Eggs roll fresh every time: the gamble is the product.
       const eggRng = ctx.rng.derive(`egg:${Date.now()}:${ctx.collection.fish.length}`);
-      const hatched = makeFishOffer(eggRng, 99);
+      const hatched = makeFishOffer(eggRng, 99, new Set(ctx.collection.fish.map((f) => f.name)));
       ctx.collection.addFish({
         id: `${Date.now().toString(36)}-egg`,
         name: hatched.name,

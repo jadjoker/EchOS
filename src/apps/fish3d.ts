@@ -11,6 +11,8 @@
  * renderer.
  */
 
+import { honk } from "../core/sound.ts";
+
 type Vec3 = readonly [number, number, number];
 
 /** Nose points along +X. Y is up, Z is across. */
@@ -89,8 +91,83 @@ export function mountFish3d(
   buffer.width = SIZE;
   buffer.height = SIZE;
 
+  /** Radians per frame when nobody is touching it. A dead fish does not turn. */
+  const AUTO_SPIN = options.deceased ? 0 : 0.018;
+  /** How long after letting go before it eases back to turning on its own. */
+  const SETTLE_AFTER = 900;
+  /** Screen pixels to radians. Roughly a full turn across the canvas. */
+  const DRAG_SCALE = 0.02;
+
   let raf = 0;
   let angle = options.deceased ? Math.PI * 0.15 : 0;
+  let spin = AUTO_SPIN;
+
+  /** Vertical drag tips the fish; it rights itself once you stop. */
+  let tilt = 0;
+
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  let releasedAt = -Infinity;
+
+  canvas.addEventListener("pointerdown", (event) => {
+    // Poking a fish should do something. Pitched from its hue so each one has
+    // its own note, and a dead one gets a lower, duller version of the same
+    // sound rather than silence, which is funnier and also tells you it heard.
+    honk(options.hue, { dull: options.deceased });
+    dragging = true;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    spin = 0;
+    // Capture keeps the drag alive when the pointer leaves the little canvas,
+    // which it will. Not worth failing the drag over if it is refused.
+    try { canvas.setPointerCapture(event.pointerId); } catch { /* drag still works */ }
+    // Otherwise a drag on the model selects the profile text behind it.
+    event.preventDefault();
+  });
+
+  canvas.addEventListener("pointermove", (event) => {
+    if (!dragging) return;
+    const dx = event.clientX - lastX;
+    const dy = event.clientY - lastY;
+    lastX = event.clientX;
+    lastY = event.clientY;
+    angle += dx * DRAG_SCALE;
+    // Clamped: past a quarter turn the flat-shaded model reads as broken
+    // rather than tipped, because it has no thickness to speak of.
+    tilt = Math.max(-0.7, Math.min(0.7, tilt + dy * DRAG_SCALE * 0.5));
+    // Carried out of the drag as momentum, so a flick keeps going.
+    spin = dx * DRAG_SCALE;
+  });
+
+  function endDrag(event: PointerEvent): void {
+    if (!dragging) return;
+    dragging = false;
+    releasedAt = performance.now();
+    try {
+      if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+    } catch { /* nothing to release */ }
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  /**
+   * Deterministic idle noise — layered sines rather than Math.random, because
+   * everything else in this machine reproduces from its seed and a renderer
+   * that quietly did not would be a hole in that. Reads as a fish holding
+   * station, not as a turntable.
+   */
+  function wobble(t: number): number {
+    return Math.sin(t * 0.0011) * 0.6 + Math.sin(t * 0.0027 + 1.3) * 0.3
+      + Math.sin(t * 0.0061 + 2.7) * 0.1;
+  }
+
+  /**
+   * Offsets the noise per fish, so two profiles open at once do not drift in
+   * lockstep. Taken from the hue because it is already unique per fish and
+   * costs no roll, which keeps the seed untouched.
+   */
+  const phase = options.hue * 37;
 
   function frame(time: number): void {
     const bc = buffer.getContext("2d");
@@ -106,17 +183,47 @@ export function mountFish3d(
 
     bc.clearRect(0, 0, SIZE, SIZE);
 
+    if (!dragging) {
+      // A flick coasts, then the fish remembers what it was doing. Easing
+      // toward AUTO_SPIN rather than snapping is the whole difference between
+      // "it went back to spinning" and "the animation restarted".
+      const settled = time - releasedAt > SETTLE_AFTER;
+      spin += (AUTO_SPIN - spin) * (settled ? 0.04 : 0.006);
+      angle += spin;
+      tilt *= 0.94;
+    }
+
     // A dead fish drifts belly-up rather than turning on display.
-    if (!options.deceased) angle += 0.018;
-    const roll = options.deceased ? Math.PI : Math.sin(time / 1600) * 0.12;
+    const idleRoll = options.deceased ? Math.PI : Math.sin(time / 1600) * 0.12;
+    // Noise is damped while held: a fish you have hold of is steadier than one
+    // left to its own devices.
+    const jitter = dragging ? 0.25 : 1;
+    const roll = idleRoll + tilt + wobble(time + phase + 5000) * 0.09 * jitter;
+    const shown = angle + wobble(time + phase) * 0.07 * jitter;
+
+    /**
+     * Holding station, as a change of PLACE rather than of angle.
+     *
+     * The first attempt at this noise only perturbed rotation, on a fish that
+     * is already turning a degree a frame, so it was mathematically present
+     * and visually absent. Drift is what reads as a live thing keeping itself
+     * in one spot, and it stays legible whether the fish is spinning or dead.
+     *
+     * Weighted to the vertical: the fish is already as wide as the frame at
+     * some angles, so sideways drift only buys more cropping, while there is
+     * clear air above and below. A fish holding station bobs more than it
+     * slides anyway.
+     */
+    const driftX = wobble(time * 0.7 + phase + 300) * SIZE * 0.012 * jitter;
+    const driftY = wobble(time * 1.1 + phase) * SIZE * 0.055 * jitter;
 
     const projected = V.map((v) => {
-      const r = rotateZ(rotateY(v, angle), roll);
+      const r = rotateZ(rotateY(v, shown), roll);
       // Weak perspective — enough to read as 3D, not enough to look modern.
       const depth = 1 / (2.6 - r[2] * 0.5);
       return {
-        x: SIZE / 2 + r[0] * SIZE * 0.42 * depth * 2.6,
-        y: SIZE / 2 - r[1] * SIZE * 0.42 * depth * 2.6,
+        x: SIZE / 2 + driftX + r[0] * SIZE * 0.42 * depth * 2.6,
+        y: SIZE / 2 + driftY - r[1] * SIZE * 0.42 * depth * 2.6,
         z: r[2],
         world: r,
       };

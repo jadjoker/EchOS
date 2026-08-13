@@ -132,13 +132,49 @@ function read(): Stored {
     // collection somebody has spent real sessions building.
     const record = parsed as Partial<Stored>;
     return {
-      fish: Array.isArray(record.fish) ? record.fish.filter(isOwnedFish) : [],
+      fish: Array.isArray(record.fish) ? record.fish.filter(isOwnedFish).map(repairLore) : [],
       upgrades: Array.isArray(record.upgrades) ? record.upgrades : [],
       food: typeof record.food === "number" && record.food >= 0 ? record.food : 0,
     };
   } catch {
     return empty;
   }
+}
+
+/**
+ * Fill in whatever the stored lore is missing.
+ *
+ * `isOwnedFish` only proves lore is an object, and the profile window then
+ * reads eight fields off it — two of which it calls `.join()` on. A fish saved
+ * before a field existed, or edited by hand, therefore crashed the window when
+ * clicked, which is the one outcome this file exists to prevent: the collection
+ * is the only thing in EchOS that survives a reboot.
+ *
+ * Backfilled rather than rejected. A fish with a missing quote is still your
+ * fish, and dropping it to keep the type honest would be the same data loss by
+ * a tidier route. The defaults read as a record that was never completed —
+ * which, for a machine recovered from somebody else, is true.
+ */
+function repairLore(fish: OwnedFish): OwnedFish {
+  const lore = fish.lore as Partial<FishLore> | null | undefined;
+  const strings = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  const text = (value: unknown, fallback: string): string =>
+    typeof value === "string" && value.trim() ? value : fallback;
+
+  return {
+    ...fish,
+    lore: {
+      age: text(lore?.age, "unknown — records were not kept"),
+      temperament: text(lore?.temperament, "unrecorded"),
+      likes: strings(lore?.likes),
+      dislikes: strings(lore?.dislikes),
+      quote: text(lore?.quote, ""),
+      acquired: text(lore?.acquired, "unknown"),
+      recordedBy: text(lore?.recordedBy, "nobody"),
+      deceased: lore?.deceased === true,
+    },
+  };
 }
 
 function isOwnedFish(value: unknown): value is OwnedFish {
