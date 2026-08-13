@@ -169,6 +169,24 @@ export function webSafe(c: Hsl): Hsl {
   return rgbToHsl(snap(r), snap(g), snap(b));
 }
 
+/**
+ * Read a colour token back out of the live theme.
+ *
+ * Anything that draws to a canvas needs this: the tokens are the single source
+ * of the machine's look, but a canvas cannot use `var(--c-accent)`, so a
+ * generated object has to ask what the accent currently is and paint with it.
+ * Without this, canvas work is the one place where a colour gets hardcoded and
+ * the aesthetic quietly stops being a data change.
+ */
+export function tokenHsl(name: string, fallback: string): Hsl {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  return rgbToHsl(
+    parseInt(raw.slice(1, 3), 16),
+    parseInt(raw.slice(3, 5), 16),
+    parseInt(raw.slice(5, 7), 16),
+  );
+}
+
 /** Channels 0–255. */
 export function rgbToHsl(r255: number, g255: number, b255: number): Hsl {
   const r = clamp(r255, 0, 255) / 255;

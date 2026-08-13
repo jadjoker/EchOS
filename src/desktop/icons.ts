@@ -12,22 +12,13 @@
 
 import type { Rng } from "../core/rng.ts";
 import { generateTile, TILE_KINDS } from "../theme/texture.ts";
-import { rgbToHsl } from "../theme/color.ts";
+import { tokenHsl } from "../theme/color.ts";
 
 export interface IconSpec {
   id: string;
   label: string;
   glyph: string;
   open(): void;
-}
-
-function tokenHsl(name: string, fallback: string) {
-  const raw = getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-  return rgbToHsl(
-    parseInt(raw.slice(1, 3), 16),
-    parseInt(raw.slice(3, 5), 16),
-    parseInt(raw.slice(5, 7), 16),
-  );
 }
 
 export function createDesktopIcons(
