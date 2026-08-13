@@ -394,6 +394,17 @@ optgroup {
   pointer-events: none;
 }
 
+/**
+ * Connection ports.
+ *
+ * These sit on top of every window, so at full strength they were the loudest
+ * thing on a desktop whose whole job is looking like somebody else's machine.
+ * Quiet at rest, full strength on the window you are actually pointing at, and
+ * unmissable while a cable is in the air.
+ *
+ * The dot got smaller. The target did not: see the pad below. Making a control
+ * subtler must not make it harder to hit, and these are already small.
+ */
 .port {
   position: absolute;
   width: var(--port-size);
@@ -403,7 +414,32 @@ optgroup {
   border-radius: var(--radius-control);
   cursor: crosshair;
   touch-action: none;
-  transition: transform var(--motion-fast) var(--ease-ui);
+  opacity: 0.4;
+  transform: scale(0.78);
+  transition:
+    transform var(--motion-fast) var(--ease-ui),
+    opacity var(--motion-fast) var(--ease-ui);
+}
+
+/**
+ * The hit area, held at its original size while the dot shrank.
+ *
+ * A pseudo-element rather than padding, because padding would grow the dot
+ * itself. elementFromPoint reports the parent for a pseudo-element, so the
+ * drop hit-test in workspace.ts still finds .port-in exactly as before.
+ */
+.port::before {
+  content: "";
+  position: absolute;
+  inset: calc(var(--port-size) * -0.45);
+}
+
+/* On the window you are pointing at, or the one you are working in, they are
+   worth seeing. Everywhere else they stay out of the way. */
+.win:hover .port,
+.win.is-focused .port {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .port-in {
@@ -416,21 +452,34 @@ optgroup {
 
 .port:hover,
 .port.is-target {
+  opacity: 1;
   transform: scale(1.35);
 }
 
+/* Feedback on a drop always shows at full strength, wherever the port was. */
 .port.is-reject {
+  opacity: 1;
   background: var(--c-boot-fail);
 }
 
 .port.is-flash {
+  opacity: 1;
   background: var(--c-boot-ok);
 }
 
 /* While patching, every input port is a target worth seeing. */
 body.is-patching .port-in {
+  opacity: 1;
   transform: scale(1.3);
   box-shadow: 0 0 0 3px var(--c-accent);
+}
+
+/* Cables take pointer events so they can be clicked to disconnect — which
+   means a cable lying across a port was answering the drop hit-test instead of
+   the port, and the connection was silently dropped. The more you had patched,
+   the more often it happened. Nothing needs to be clickable mid-drag. */
+body.is-patching .cable {
+  pointer-events: none;
 }
 
 /* ---- taskbar ------------------------------------------------------------- */

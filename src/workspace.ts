@@ -159,13 +159,21 @@ export class Workspace {
       const onUp = (up: PointerEvent) => {
         window.removeEventListener("pointermove", onMove);
         window.removeEventListener("pointerup", onUp);
-        document.body.classList.remove("is-patching");
 
         // Hit-test on release: the port is a small target and the pointer may
         // never have entered it cleanly.
+        //
+        // This has to happen BEFORE is-patching comes off. Cables take pointer
+        // events so they can be clicked to disconnect, and a cable lying across
+        // a port answers the hit-test instead of the port — so the rule that
+        // silences them is only in force while that class is set. Dropping the
+        // class first put it back a line too early, and the connection was
+        // discarded in silence.
         const target = document
           .elementFromPoint(up.clientX, up.clientY)
           ?.closest<HTMLElement>(".port-in");
+
+        document.body.classList.remove("is-patching");
         this.dragFrom = null;
         if (!target) return;
 
