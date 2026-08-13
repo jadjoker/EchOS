@@ -205,6 +205,17 @@ export const fishTankApp: AppDef = {
     // feel fake — you bought a fish and the tank, already open, never noticed.
     let owned: Fish[] = [];
 
+    /**
+     * Open fish panels, so a purchase reaches the list as well as the water.
+     *
+     * Driven from syncOwned rather than from collection.onChange directly. A
+     * panel reads `owned`, so it must not run until `owned` has been rebuilt,
+     * and registering a second listener would leave that ordering resting on
+     * which listener happened to subscribe first. This way the dependency is
+     * the call itself.
+     */
+    const panels = new Set<() => void>();
+
     function syncOwned(): void {
       const existing = new Map(owned.map((f) => [f.collectionId, f]));
       owned = ctx.collection.fish
@@ -233,6 +244,7 @@ export const fishTankApp: AppDef = {
           };
         });
       updateCaption();
+      for (const refresh of panels) refresh();
     }
 
     /** Everything currently swimming: the machine's, yours, and visitors. */
@@ -326,20 +338,34 @@ export const fishTankApp: AppDef = {
      * Residents and yours only. Visitors arriving over the bus are foreign
      * agents wearing fish shapes, with no lore behind them, so a row for one
      * would open nothing.
+     *
+     * The list follows the collection. Built once at open time, it had the
+     * same fault the tank itself used to have: buy a fish with the panel
+     * already open and the fish swam in while the list of what was in the tank
+     * carried on saying otherwise.
      */
     function openFishPanel(): void {
       const list = document.createElement("div");
       list.className = "fish-panel";
-      const models: { stop(): void }[] = [];
 
-      for (const fish of [...residents, ...owned]) {
+      /**
+       * Keyed by the fish, so a refresh keeps the rows it already has.
+       *
+       * Rebuilding the list wholesale would be simpler and would restart every
+       * row's model mid-turn and throw away the scroll position, which is a
+       * strange thing to happen to the window you are reading because you
+       * bought something in another one.
+       */
+      const rows = new Map<Fish, { el: HTMLElement; model: { stop(): void } }>();
+
+      function buildRow(fish: Fish): { el: HTMLElement; model: { stop(): void } } {
         const row = document.createElement("button");
         row.type = "button";
         row.className = "fish-row";
 
         const bust = document.createElement("div");
         bust.className = "fish-row-model";
-        models.push(mountFish3d(bust, { hue: fish.hue, deceased: fish.dead }));
+        const model = mountFish3d(bust, { hue: fish.hue, deceased: fish.dead });
 
         const name = document.createElement("span");
         name.className = "fish-row-name";
@@ -354,8 +380,37 @@ export const fishTankApp: AppDef = {
           openProfile(fish);
           ctx.nudge("inspect");
         });
-        list.append(row);
+        return { el: row, model };
       }
+
+      function refresh(): void {
+        const wanted = [...residents, ...owned];
+        const present = new Set(wanted);
+
+        // A fish can leave the list as well as join it: an upgrade sold on
+        // would drop the ones past the new capacity.
+        for (const [fish, row] of rows) {
+          if (present.has(fish)) continue;
+          row.model.stop();
+          row.el.remove();
+          rows.delete(fish);
+        }
+
+        for (const fish of wanted) {
+          let row = rows.get(fish);
+          if (!row) {
+            row = buildRow(fish);
+            rows.set(fish, row);
+          }
+          // Appending one that is already last leaves it where it is, and
+          // moving a canvas does not disturb the loop drawing into it, so this
+          // keeps the order right without rebuilding anything.
+          list.append(row.el);
+        }
+      }
+
+      refresh();
+      panels.add(refresh);
 
       ctx.openWindow({
         title: "Fish",
@@ -364,7 +419,10 @@ export const fishTankApp: AppDef = {
         height: 300,
         // Every row owns a running animation loop. Without this they keep
         // turning in a window nobody can see.
-        onClose: () => { for (const model of models) model.stop(); },
+        onClose: () => {
+          panels.delete(refresh);
+          for (const row of rows.values()) row.model.stop();
+        },
       });
     }
 
