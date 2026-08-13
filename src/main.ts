@@ -19,6 +19,7 @@ import { browserApp } from "./apps/browser.ts";
 import { fishTankApp } from "./apps/fishtank.ts";
 import { weatherApp } from "./apps/weather.ts";
 import { filesApp } from "./apps/filesapp.ts";
+import { newsApp } from "./apps/news.ts";
 
 /**
  * A seed in the URL boots that exact machine; without one you get a new
@@ -72,7 +73,7 @@ async function main(): Promise<void> {
 
   // Nothing opens on boot. An empty desktop you have to explore reads as a
   // machine somebody left behind; a pre-arranged set of windows reads as a demo.
-  const programs = [browserApp, fishTankApp, shopApp, weatherApp, filesApp];
+  const programs = [browserApp, fishTankApp, shopApp, weatherApp, filesApp, newsApp];
   const icons: IconSpec[] = programs.map((def) => ({
     id: def.id,
     label: def.title,
