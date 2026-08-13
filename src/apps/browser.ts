@@ -175,10 +175,7 @@ export const browserApp: AppDef = {
       heading.className = "browser-home-title";
       heading.textContent = "Where do you want to go?";
 
-      const hint = document.createElement("p");
-      hint.className = "browser-home-hint";
-      hint.textContent = "Type any address. Anything at all — a real word, a made-up one. It exists.";
-      wrap.append(heading, hint);
+      wrap.append(heading);
 
       const list = document.createElement("div");
       list.className = "browser-home-links";

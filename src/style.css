@@ -1085,14 +1085,11 @@ body.is-patching .cable {
 }
 
 .browser-home-title {
-  margin: 0 0 0.4em;
+  /* The gap the removed hint line used to provide. Without it the suggested
+     addresses crowd the heading and read as part of it. */
+  margin: 0 0 1.4em;
   font-family: var(--font-display);
   font-size: calc(var(--size-ui) * 1.6);
-}
-
-.browser-home-hint {
-  margin: 0 0 1.4em;
-  color: var(--c-ink-muted);
 }
 
 .browser-home-links {
