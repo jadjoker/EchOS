@@ -804,6 +804,32 @@ body.is-patching .cable {
   cursor: pointer;
 }
 
+/* Small icon button for aquarium music mute/unmute, sits in the app controls area. */
+.tank-mute {
+  min-width: 1.8em;
+  padding: 0 6px;
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Volume slider for aquarium music — compact range that lives next to the mute button.
+   Pushed to the far right of the controls bar. */
+.app-controls > .tank-mute {
+  margin-left: auto;
+}
+
+.tank-vol {
+  display: flex;
+  align-items: center;
+}
+
+.tank-vol input[type="range"] {
+  width: 68px;
+  height: 16px;
+  accent-color: var(--c-accent);
+  cursor: pointer;
+}
+
 /* ---- shop ---------------------------------------------------------------- */
 
 .shop-balance {

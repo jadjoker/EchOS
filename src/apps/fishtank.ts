@@ -18,6 +18,7 @@ import { formFor, type FishForm } from "../gen/fishform.ts";
 import { mountFish3d } from "./fish3d.ts";
 import { award } from "../core/achievements.ts";
 import tankFootage from "../assets/tank-vintage-scuba.mp4";
+import aquariumMusic from "../assets/aquarium.mp3";
 import * as generated from "../gen/fishlore.generated.ts";
 
 const SPECIES_HEAD = [...`Golden Spotted Ribbon Paper Glass Blue Banded Dwarf Royal
@@ -134,6 +135,65 @@ export const fishTankApp: AppDef = {
   create(ctx) {
     const { root, controls, stage } = appShell();
     const rng = ctx.rng;
+
+    // Aquarium music (external asset). Loops quietly in the background.
+    // Started on open (user gesture from launching the window), so autoplay policy allows it.
+    const music = new Audio(aquariumMusic);
+    music.loop = true;
+    music.volume = 0.55; // pleasant default
+
+    void music.play().catch(() => {
+      // Autoplay may be blocked in some environments; the controls can start it.
+    });
+
+    // Mute/unmute + volume controls at the top of the app.
+    const muteBtn = document.createElement("button");
+    muteBtn.type = "button";
+    muteBtn.className = "ctl-button tank-mute";
+    muteBtn.textContent = "♪";
+    muteBtn.title = "Mute aquarium music";
+
+    let isMuted = false;
+    let lastVolume = music.volume;
+
+    muteBtn.addEventListener("click", () => {
+      isMuted = !isMuted;
+      music.muted = isMuted;
+      if (!isMuted) {
+        music.volume = lastVolume;
+      }
+      muteBtn.textContent = isMuted ? "🔇" : "♪";
+      muteBtn.title = isMuted ? "Unmute aquarium music" : "Mute aquarium music";
+    });
+
+    // Compact volume slider
+    const volWrap = document.createElement("label");
+    volWrap.className = "tank-vol";
+    volWrap.title = "Volume";
+
+    const volSlider = document.createElement("input");
+    volSlider.type = "range";
+    volSlider.min = "0";
+    volSlider.max = "1";
+    volSlider.step = "0.05";
+    volSlider.value = String(music.volume);
+
+    volSlider.addEventListener("input", () => {
+      lastVolume = Number(volSlider.value);
+      music.volume = lastVolume;
+
+      // Dragging the slider above zero while muted = auto-unmute
+      if (lastVolume > 0 && isMuted) {
+        isMuted = false;
+        music.muted = false;
+        muteBtn.textContent = "♪";
+        muteBtn.title = "Mute aquarium music";
+      }
+    });
+
+    volWrap.append(volSlider);
+
+    controls.append(muteBtn, volWrap);
 
     const canvas = document.createElement("canvas");
     canvas.className = "tank-canvas";
@@ -783,6 +843,11 @@ export const fishTankApp: AppDef = {
       dispose: () => {
         cancelAnimationFrame(frame);
         offCollection();
+
+        // Stop the music when the aquarium window is closed.
+        music.pause();
+        music.src = "";
+
         // Closing the window has to stop the decoder too. A paused video with
         // its src cleared is the only way to be sure it is not still being
         // decoded for a canvas nobody is drawing.
