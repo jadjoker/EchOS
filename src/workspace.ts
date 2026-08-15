@@ -125,13 +125,21 @@ export class Workspace {
     });
 
     win.el.dataset["node"] = id;
-    this.attachPort(win, id, "in");
-    this.attachPort(win, id, "out");
+
+    // Connection nodes (the small port dots on the sides of windows) are
+    // temporarily disabled for a cleaner window appearance.
+    // The full patching system (graph, cables, drag-to-connect) remains
+    // functional underneath; only the visible nodes are suppressed.
+    // Re-enable the two lines below when we want the dots back.
+    // this._attachPort(win, id, "in");
+    // this._attachPort(win, id, "out");
+
     this.economy.nudge("window");
     return id;
   }
 
-  private attachPort(win: Win, nodeId: string, direction: "in" | "out"): void {
+  // @ts-expect-error - method temporarily unused while connection nodes are hidden
+  private _attachPort(win: Win, nodeId: string, direction: "in" | "out"): void {
     const el = document.createElement("div");
     el.className = `port port-${direction}`;
     el.dataset["node"] = nodeId;

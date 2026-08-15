@@ -44,7 +44,7 @@ export const weatherApp: AppDef = {
     const { root, controls, stage } = appShell();
     const rng = ctx.rng;
 
-    const town = townName(rng);
+    const initialTown = townName(rng);
     const base = rng.range(-2, 22);
     const swing = rng.range(3, 11);
 
@@ -52,8 +52,22 @@ export const weatherApp: AppDef = {
     panel.className = "weather";
     stage.append(panel);
 
+    let currentTown = initialTown;
     let offset = 0;
     let arriving: Influence | null = null;
+
+    function resolveTown(input: string): string {
+      const cleaned = input.trim();
+      if (cleaned.length >= 3) {
+        // Literal user input becomes the town name (title-cased).
+        // This is what "search for a place" feels like — "bramford", "my station",
+        // even "xyz" or a misspelling all work. Short/empty falls back so the UI
+        // never shows garbage.
+        return cleaned.replace(/\b\w/g, (c) => c.toUpperCase());
+      }
+      // Stable fallback for this machine (derived so it does not shift other rolls).
+      return townName(rng.derive("lookup-fallback"));
+    }
 
     function history(): number[] {
       const borrowed = arriving?.rhythm ?? [];
@@ -82,7 +96,7 @@ export const weatherApp: AppDef = {
       const [label, glyph] = fRng.pick(CONDITIONS);
       const place = document.createElement("div");
       place.className = "weather-town";
-      place.textContent = town;
+      place.textContent = currentTown;
       const nowLine = document.createElement("div");
       nowLine.className = "weather-now";
       nowLine.textContent = `${glyph}  ${now.toFixed(1)}°  ${label}`;
@@ -127,7 +141,7 @@ export const weatherApp: AppDef = {
       const sighting = arriving?.agents[0];
       remark.textContent = sighting
         ? `Reported near the station: ${sighting.label}. ${arriving?.agents.length ?? 0} in total. Nobody has explained it.`
-        : ctx.rng.derive(`remark:${town}`).pick(REMARKS);
+        : ctx.rng.derive(`remark:${currentTown}`).pick(REMARKS);
 
       panel.append(head, chart, list, remark);
     }
@@ -138,6 +152,33 @@ export const weatherApp: AppDef = {
       ctx.changed();
       ctx.nudge("tinker");
     }));
+
+    const lookup = document.createElement("input");
+    lookup.type = "text";
+    lookup.className = "weather-lookup";
+    lookup.placeholder = "town or station…";
+    lookup.spellcheck = false;
+    lookup.setAttribute("aria-label", "Search for a place");
+
+    const lookupBtn = button("Look up", () => {
+      const newTown = resolveTown(lookup.value);
+      if (newTown !== currentTown) {
+        currentTown = newTown;
+        render();
+        ctx.changed();
+        ctx.nudge("tinker");
+      }
+      lookup.value = "";
+    });
+
+    lookup.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        lookupBtn.click();
+      }
+    });
+
+    controls.append(lookup, lookupBtn);
+
     render();
 
     return {
@@ -163,7 +204,7 @@ export const weatherApp: AppDef = {
                   kind: "drop" as const, label: "rain", hue: 205,
                   size: 0.4, speed: 0.5 + i * 0.06,
                 })),
-            words: [town.toLowerCase(), "forecast", "station", "readings"],
+            words: [currentTown.toLowerCase(), "forecast", "station", "readings"],
             palette: [mean < 6 ? 205 : 40],
             rhythm: temps.map((t) => (t - base) / Math.max(1, swing * 1.5)),
             scalars: { temperature: mean },

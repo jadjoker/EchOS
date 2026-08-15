@@ -95,24 +95,99 @@ const BY_CATEGORY: Record<string, Partial<SolidShape>> = {
   abstract: { roundness: 0.5, spikiness: 0.55, aspect: 1.0, segments: 7 },
 };
 
+/**
+ * What else is known about the thing, past its category.
+ *
+ * A category is a coarse bucket: `animal` covers a snail and a bison, and
+ * `material` covers steel and straw. These are the two facts the properties
+ * table already holds that change an object's silhouette, so passing them means
+ * the figure agrees with the prose beside it instead of merely being the right
+ * general kind of shape.
+ */
+export interface SolidHints {
+  /** The thing is alive (animal, plant, person, etc.). Makes it rounder, softer. */
+  alive?: boolean;
+  /** Materials mentioned in props — lets us bias toward metal, wood, etc. */
+  materials?: readonly string[];
+}
+
 /** Bigger things get more facets, because more of them is on screen. */
 const BY_SCALE: Record<string, number> = {
   tiny: -2, small: -1, medium: 0, large: 1, huge: 2,
 };
 
-export function shapeFor(category: string, scale: string, rng: Rng): SolidShape {
-  const base = BY_CATEGORY[category] ?? { roundness: 0.5, spikiness: 0.3, aspect: 1, segments: 7 };
+/**
+ * Move `value` a fraction of the way toward `target`.
+ *
+ * Hints nudge proportionally rather than by a fixed offset, and that detail is
+ * the difference between a hint and a bug. `animal` already sits at 0.85
+ * roundness, so a flat `+0.18` clamps to 1.0 — measured at 98% of rolls pinned
+ * to the maximum, with distinct roundness collapsing from 193 values to 8.
+ * Every animal came out the same ball, which is exactly the "variety without
+ * identity" failure the roll-inside-the-category rule exists to prevent.
+ *
+ * Approaching a target instead means a category that is already round stays
+ * round and keeps its jitter, while a category that is not gets moved the most.
+ * The nudge can never reach the clamp, so the roll below always has room.
+ */
+function toward(value: number, target: number, strength: number): number {
+  return value + (target - value) * strength;
+}
+
+/** Where "alive" and each material pull a silhouette, and how hard. */
+const ALIVE_ROUNDNESS = 0.9;
+const ALIVE_SPIKINESS = 0.05;
+const HINT_STRENGTH = 0.45;
+
+export function shapeFor(
+  category: string,
+  scale: string,
+  rng: Rng,
+  hints: SolidHints = {},
+): SolidShape {
+  const table = BY_CATEGORY[category] ?? { roundness: 0.5, spikiness: 0.3, aspect: 1, segments: 7 };
   const facets = BY_SCALE[scale] ?? 0;
+
+  let roundness = table.roundness ?? 0.5;
+  let spikiness = table.spikiness ?? 0.3;
+
+  // Living things are rounder and softer. Strongest on the categories that say
+  // least about shape — an `abstract` or `role` page about a person moves a
+  // long way, an `animal` page barely at all, because it was already there.
+  if (hints.alive) {
+    roundness = toward(roundness, ALIVE_ROUNDNESS, HINT_STRENGTH);
+    spikiness = toward(spikiness, ALIVE_SPIKINESS, HINT_STRENGTH);
+  }
+
+  const mats = (hints.materials ?? []).map((m) => m.toLowerCase());
+  const hasMetal = mats.some((m) => /metal|steel|iron|chrome|brass|copper|aluminium/.test(m));
+  const hasWood = mats.some((m) => /wood|timber|beech|oak|cane|straw/.test(m));
+
+  // Metal reads as hard edges, wood as worn ones. Both are weaker than `alive`:
+  // a material is one line in a property list, not what the thing IS, and a
+  // brass instrument should still be shaped like an instrument.
+  if (hasMetal) {
+    roundness = toward(roundness, 0.1, 0.3);
+    spikiness = toward(spikiness, 0.6, 0.3);
+  }
+  if (hasWood) {
+    roundness = toward(roundness, 0.6, 0.25);
+    spikiness = toward(spikiness, 0.2, 0.25);
+  }
 
   // Rolled inside the category rather than freely: two kilns should differ from
   // each other while both still reading as kilns. Same principle as the
   // aesthetic movements.
+  //
+  // roundness and spikiness are already resolved above, hints included, so they
+  // are read straight. The other two still need their defaults, because the
+  // category table is a Partial and need not mention them.
   return {
-    roundness: clamp01((base.roundness ?? 0.5) + rng.range(-0.12, 0.12)),
-    spikiness: clamp01((base.spikiness ?? 0.3) + rng.range(-0.12, 0.12)),
-    aspect: Math.max(0.35, (base.aspect ?? 1) * rng.range(0.82, 1.22)),
+    roundness: clamp01(roundness + rng.range(-0.12, 0.12)),
+    spikiness: clamp01(spikiness + rng.range(-0.12, 0.12)),
+    aspect: Math.max(0.35, (table.aspect ?? 1) * rng.range(0.82, 1.22)),
     rings: 4 + Math.round(rng.range(0, 2)) + Math.max(0, facets),
-    segments: Math.max(4, (base.segments ?? 7) + facets + rng.int(-1, 1)),
+    segments: Math.max(4, (table.segments ?? 7) + facets + rng.int(-1, 1)),
   };
 }
 

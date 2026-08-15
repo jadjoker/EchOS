@@ -135,6 +135,11 @@ Boots to an **empty desktop** with generated icons. Nothing opens automatically 
 a pre-arranged set of windows reads as a demo, a desktop you explore reads as a
 machine somebody left behind. Single click selects, double click opens.
 
+Icons use deterministic per-machine layouts (grid / jitter / scattered), occasional
+rotations, "worn" faces with residue marks, and a light non-interactive clutter
+layer (notes, rings, clips, smudges) placed with edge bias. This gives a lived-in,
+"someone actually used this machine" atmosphere on top of the rings texture.
+
 The aesthetic generator was pulled forward out of order deliberately: it is
 independent of the data bus, so it doesn't compromise the step-3 gate, and it is
 far cheaper to build while only two windows exist to restyle.
@@ -156,8 +161,18 @@ rarity mechanic, and it stops being special if it fires often.
 unreadable, and a free-rolling generator reproduces that about one boot in five.
 An unreadable machine is a refund, not charming authenticity. So: roll wild,
 then force every text-on-background pairing past a minimum ratio
-(`theme/color.ts`). Verified at 18,000 pairings, zero failures. If you add a new
-token that puts text on a background, **add it to that check**.
+(`theme/color.ts`).
+
+```bash
+npm run check:contrast              # 3,000 machines
+npm run check:contrast -- --n 20000 # before shipping a palette change
+```
+
+That drives the real generator and re-measures every pairing that ships;
+currently 260,000 pairings over 20,000 machines and 225 movement variants, zero
+failures. It exits non-zero on any failure, so it can gate a build. If you add a
+token that puts text on a background, **add it to `PAIRINGS` in
+`tools/contrast-check.mjs`** — a floor with no harness regresses silently.
 
 **On the gate.** The original plan put a stop/go gate after three hand-written
 apps on the bus. Those three (Signal, Shaper, Scope) were built, found to be a
@@ -184,31 +199,38 @@ stays a data change; break it and it becomes a refactor.
 
 ```
 src/
-  core/       rng, influence traits, the connection graph
+  core/       rng, influence traits, the connection graph, coins, collection
   web/        lexicon, properties, phonetics, archetypes, page renderer
-  apps/       browser, aquarium, weather, files
+  apps/       browser, aquarium, shop, weather, files, news
   theme/      the token contract, movements, colour, textures
   wm/         window manager
   desktop/    generated icons
   fs/         virtual filesystem
   boot/       generated boot sequence
-  gen/        machine identity, place and person names, desktop clutter
-  shell/      About window, file-browser widget
+  gen/        machine identity, names, clutter, fish forms and lore, solids
+  shell/      About, the file browser, popup menus, rename, file viewers
   workspace.ts  ports, cables, and the only place that knows about both
                 windows and the bus
 ```
+
+Two things in `core/` outlive the machine and nothing else does: the coin
+balance (`economy.ts`) and the fish (`collection.ts`). Both are in
+`localStorage`, both are hand-validated on read because a player can edit them,
+and both are deliberate exceptions to "every boot is a new machine" — see the
+header comments, which argue the case.
 
 ## Not done yet
 
 Archetype expansion is the known gap — ten archetypes means pages start rhyming
 after a dozen or so, even now that layout varies.
 
-No generated cursors, wallpapers-with-imagery, or sound. No decorative junk
-beyond marquees and hit counters — no under-construction GIFs, webring badges or
-custom pointers, which is where a lot of the amateur-web character actually
-lives.
-
 The points economy is parked pending a decision, not forgotten.
 
 The values in `theme/tokens.css` are only a fallback for before the generator
 runs — not a house style.
+
+**Phase 2 desktop priorities (after this pass):**
+- Make clutter items interactive or draggable (tiny "found objects").
+- Cursor variety (generated per-machine, already in tokens).
+- More liveness on the desktop (subtle movement, reactions).
+- Revisit connection nodes (currently hidden from top of windows for a cleaner look; the graph still works).

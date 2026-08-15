@@ -61,6 +61,11 @@
   --port-size: 13px;
   --cable-width: 2px;
 
+  /* ---- cursor ----------------------------------------------------------- */
+  /* Generated per-machine for amateur-web character. Falls back to system
+     arrow when no custom image is provided. */
+  --cursor: auto;
+
   /* ---- depth ------------------------------------------------------------ */
   --shadow-window: 0 6px 20px rgb(0 0 0 / 0.35);
   --shadow-window-blur: 0 2px 8px rgb(0 0 0 / 0.2);
@@ -74,6 +79,7 @@
     var(--c-desktop) 0%,
     var(--c-desktop-alt) 100%
   );
+  --texture-desktop-imagery: none;
   --texture-surface: none;
   --texture-title: none;
 

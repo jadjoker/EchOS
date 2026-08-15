@@ -9,7 +9,8 @@
 
 import type { MachineIdentity } from "../gen/naming.ts";
 import type { Theme } from "../theme/generate.ts";
-import { normalizeSeed, randomSeed } from "../core/rng.ts";
+import { normalizeSeed } from "../core/rng.ts";
+import { bootInto, machineUrl, newMachine } from "./session.ts";
 
 function row(label: string, value: string): HTMLElement {
   const el = document.createElement("div");
@@ -25,13 +26,6 @@ function row(label: string, value: string): HTMLElement {
 
   el.append(key, val);
   return el;
-}
-
-/** Reload into a specific machine. The seed lives in the URL so it is shareable. */
-function bootInto(seed: string): void {
-  const url = new URL(window.location.href);
-  url.searchParams.set("seed", seed);
-  window.location.href = url.toString();
 }
 
 export function createAbout(identity: MachineIdentity, theme: Theme): HTMLElement {
@@ -69,15 +63,14 @@ export function createAbout(identity: MachineIdentity, theme: Theme): HTMLElemen
   copy.className = "about-button";
   copy.textContent = "Copy link";
   copy.addEventListener("click", async () => {
-    const url = new URL(window.location.href);
-    url.searchParams.set("seed", identity.seed);
+    const url = machineUrl(identity.seed);
     try {
-      await navigator.clipboard.writeText(url.toString());
+      await navigator.clipboard.writeText(url);
       copy.textContent = "Copied";
     } catch {
       // Clipboard is permission-gated and fails silently in some contexts;
       // fall back to showing the URL rather than pretending it worked.
-      seedInput.value = url.toString();
+      seedInput.value = url;
       seedInput.select();
       copy.textContent = "Select + copy";
     }
@@ -102,7 +95,7 @@ export function createAbout(identity: MachineIdentity, theme: Theme): HTMLElemen
   fresh.type = "button";
   fresh.className = "about-button about-button-primary";
   fresh.textContent = "New machine";
-  fresh.addEventListener("click", () => bootInto(randomSeed()));
+  fresh.addEventListener("click", () => newMachine());
 
   // The heading above is the *machine's* generated OS name, which changes every
   // boot. This is the name of the thing you are actually running, and it is the

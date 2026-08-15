@@ -25,11 +25,12 @@ export type TileKind =
   | "grid"
   | "confetti"
   | "waves"
-  | "dither";
+  | "dither"
+  | "rings";
 
 export const TILE_KINDS: readonly TileKind[] = [
   "checks", "dots", "stars", "plaid", "bricks", "hearts", "noise",
-  "diagonal", "scanlines", "hatch", "grid", "confetti", "waves", "dither",
+  "diagonal", "scanlines", "hatch", "grid", "confetti", "waves", "dither", "rings",
 ];
 
 export interface TileColors {
@@ -236,6 +237,39 @@ const PAINTERS: Record<TileKind, Painter> = {
           if ((x + y) % 2 === 0) ctx.fillRect(x, y, 1, 1);
         }
       }
+    },
+  },
+
+  rings: {
+    size: 64,
+    paint(ctx, size, c, rng) {
+      // Subtle concentric rings for "light imagery" — old monitor rings,
+      // watermarks, radar, coffee stains. Very low alpha so it sits behind
+      // icons as atmosphere rather than competing with them.
+      ctx.strokeStyle = toHex(rng.chance(0.35) ? c.accent : c.fg);
+      ctx.lineWidth = rng.range(0.7, 1.4);
+      ctx.globalAlpha = 0.16;
+
+      const cx = size * (0.42 + rng.range(-0.05, 0.12));
+      const cy = size * (0.38 + rng.range(-0.05, 0.12));
+
+      for (let i = 1; i <= 4; i++) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, (size / 4.5) * i * 0.95, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // Occasional broken/offset ring for lived-in character
+      if (rng.chance(0.45)) {
+        ctx.globalAlpha = 0.10;
+        ctx.beginPath();
+        const ox = size - cx * 0.9;
+        const oy = size - cy * 0.85;
+        ctx.arc(ox, oy, size / 3.2, rng.range(0.2, 1.1), rng.range(4.8, 5.8));
+        ctx.stroke();
+      }
+
+      ctx.globalAlpha = 1;
     },
   },
 };

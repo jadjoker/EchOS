@@ -115,7 +115,7 @@ export const MOVEMENTS: readonly Movement[] = [
     },
     depth: ["none", "hard"],
     texture: {
-      desktop: ["stars", "checks", "hearts", "confetti", "plaid", "bricks"],
+      desktop: ["stars", "checks", "hearts", "confetti", "plaid", "bricks", "rings"],
       surface: ["dots", "grid", "hearts"],
       titleChance: 0.35,
     },
@@ -151,7 +151,7 @@ export const MOVEMENTS: readonly Movement[] = [
     },
     depth: ["none", "hard"],
     texture: {
-      desktop: ["stars", "confetti", "noise", "hearts"],
+      desktop: ["stars", "confetti", "noise", "hearts", "rings"],
       surface: ["noise", "scanlines"],
       titleChance: 0.4,
     },

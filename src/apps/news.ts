@@ -67,6 +67,43 @@ const CHYRON = [
   "Corner shop closes for good. It reopens Monday",
   "Fireworks display postponed until it is less dark",
   "Hedge cut back to the line agreed in the treaty of 1991",
+
+  // Stories that are not local, or not stories. The bank above is one village
+  // being reported on too closely; these are the wire copy that gets read out
+  // between those, and they let the crawl change register without changing
+  // voice. Same deadpan, larger world, less sense.
+  "Guy from Miami found dead in Miami",
+  "Local ne'er-do-well turns a new leaf",
+  "Jimmy Hoffa found alive",
+  "Jimmy Cracked corn",
+  "Man from Ohio found in Ohio. Police confirm he lives there",
+  "Woman survives fall from ground level",
+  "Local man does exactly what was expected of him",
+  "Nothing has happened on Fenwick Street. We sent someone anyway",
+  "Weather to continue, forecasters agree",
+  "Study finds most people are somewhere at any given time",
+  "Amelia Earhart located, will not say where she has been",
+  "Elvis seen at the tombola. Declined to sing",
+  "Man declared dead in 1998 asks to be removed from the mailing list",
+  "Correction: last night's obituary was for a different Gerald",
+  "Old woman who lived in a shoe cited for overcrowding",
+  "Humpty Dumpty inquiry finds the wall was never at fault",
+  "Cow clears moon by a comfortable margin. Dish still missing",
+  "Jack and Jill both stable. Hill unchanged",
+  "Man arrested for the third time this week, same reason each time",
+  "Thief returns stolen ladder, takes a different ladder",
+  "Suspect fled on a lawnmower and was caught on Tuesday",
+  "Police ask the public to stop calling about the man in the tree",
+  "Man confesses on tape to a crime nobody has reported",
+  "Sinkhole opens, closes, apologises",
+  "Everything is fine at the plant. We asked twice",
+  "A second bridge has been found underneath the first bridge",
+  "Man wins the lottery twice, loses the ticket twice",
+  "Town twinned with a town that does not exist",
+  "The moon came up early. Nobody can account for it",
+  "The hum has moved. It is now in the car park",
+  "Update on the green situation at 5pm, as promised",
+
   "That is all from us. It is not all that happened",
 ];
 
@@ -81,6 +118,17 @@ const SEGMENTS = [
 ];
 
 const STATION_TAIL = ["TV", "Broadcasting", "Regional", "Television", "Network"];
+
+/**
+ * How fast the crawl reads, in characters per second, at rest.
+ *
+ * The duration has to be derived from the text and not fixed, because the
+ * animation always travels one copy of the bank in whatever time it is given:
+ * a fixed 90s means every line added speeds the crawl up, and the bank is meant
+ * to grow. This number is the rate the first forty lines happened to run at, so
+ * the pace is unchanged and stays unchanged the next time lines are added.
+ */
+const CHYRON_CHARS_PER_SECOND = 28;
 
 export const newsApp: AppDef = {
   id: "news",
@@ -174,7 +222,8 @@ export const newsApp: AppDef = {
       const pulse = arriving?.rhythm?.length
         ? Math.abs(arriving.rhythm.reduce((a, b) => a + b, 0) / arriving.rhythm.length)
         : 0;
-      track.style.setProperty("--chyron-seconds", `${Math.round(90 / (1 + pulse * 2))}s`);
+      const seconds = text.length / CHYRON_CHARS_PER_SECOND;
+      track.style.setProperty("--chyron-seconds", `${Math.round(seconds / (1 + pulse * 2))}s`);
       const first = document.createElement("span");
       first.className = "news-chyron-text";
       first.textContent = text;

@@ -13,7 +13,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "check:contrast": "node tools/contrast-check.mjs"
   },
   "devDependencies": {
     "electron": "^43.4.0",

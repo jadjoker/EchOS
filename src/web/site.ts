@@ -1092,7 +1092,14 @@ export function buildPage(rng: Rng, subject: Subject, infusion?: Infusion): Page
 
   // Its own substream, so adding the object generator does not shift a single
   // roll in the prose and every page already shared stays word-for-word itself.
-  const solid = shapeFor(subject.category, p.scale, rng.derive("solid"));
+  //
+  // The hints come from the same properties the prose is written from, which is
+  // the point: a page that says a thing is kept in a hutch and made of wire
+  // mesh should not be illustrated with a hard metal spike.
+  const solid = shapeFor(subject.category, p.scale, rng.derive("solid"), {
+    alive: p.alive,
+    materials: p.material,
+  });
 
   return { domain: subject.domain, title: titleFor(archetype, name), archetype, blocks, solid };
 }

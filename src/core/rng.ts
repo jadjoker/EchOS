@@ -91,10 +91,23 @@ export class Rng {
    *
    * Derived from the root, not the current state, so it does not matter when
    * during a boot you ask for it.
+   *
+   * The root is mixed in by HASHING IT TOGETHER with the namespace, not by
+   * XOR-ing. XOR is commutative and self-inverse, which quietly broke the one
+   * guarantee this method exists to provide:
+   *
+   *   derive("a").derive("b")  ===  derive("b").derive("a")
+   *   derive("x").derive("x")  ===  the root stream itself
+   *
+   * Nested derives are already normal here — the browser derives `app:browser`
+   * then `page:<domain>`, a site derives `site:<domain>` then `solid:<caption>`
+   * — so two unrelated chains could land on one stream and produce the same
+   * "random" object twice, or collapse back onto the root and correlate with
+   * everything. Composing the string first makes the order of a chain matter,
+   * which is what a namespace path is supposed to mean.
    */
   derive(namespace: string): Rng {
-    const child = (this.root ^ hashString(namespace)) >>> 0;
-    return new Rng(this.seed, child);
+    return new Rng(this.seed, hashString(`${this.root}/${namespace}`));
   }
 
   /** Float in [0, 1). */

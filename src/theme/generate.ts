@@ -253,6 +253,18 @@ export function generateTheme(rootRng: Rng): Theme {
         })
       : `linear-gradient(${Math.round(rng.range(120, 200))}deg, ${toHex(p.desktop)} 0%, ${toHex(p.desktopAlt)} 100%)`;
 
+  // Light imagery layer: subtle "found object" marks (rings, stains, old monitor
+  // ghosts) that sit behind the main desktop pattern. Always uses the imagery
+  // tile so it stays very faint and atmospheric. Deterministic, no new RNG
+  // streams. This is the main lever for "the machine was used".
+  const desktopImagery = rng.chance(0.72)
+    ? textureValue(rng, ["rings"], {
+        bg: p.desktop,
+        fg: p.desktopAlt,
+        accent: p.accent,
+      })
+    : "none";
+
   const surfaceTexture = textureValue(rng, movement.texture.surface, {
     bg: p.surface,
     fg: p.surfaceAlt,
@@ -310,6 +322,7 @@ export function generateTheme(rootRng: Rng): Theme {
     "--shadow-control": shadows.control,
 
     "--texture-desktop": desktopTexture,
+    "--texture-desktop-imagery": desktopImagery,
     "--texture-surface": surfaceTexture,
     "--texture-title": titleTexture,
 

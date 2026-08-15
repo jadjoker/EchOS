@@ -14,6 +14,7 @@ body {
   margin: 0;
   height: 100%;
   overflow: hidden;
+  cursor: var(--cursor);
 }
 
 body {
@@ -110,10 +111,13 @@ optgroup {
   position: absolute;
   inset: 0 0 var(--taskbar-height) 0;
   /* Split rather than shorthand: --texture-desktop may be a generated tile
-     url() that needs a colour behind it, or a gradient that doesn't. */
+     url() that needs a colour behind it, or a gradient that doesn't.
+     Imagery (rings etc.) is a second faint layer painted *under* the main
+     desktop texture so it reads as subtle "found object" marks / atmosphere
+     without competing with icons or the primary pattern. */
   background-color: var(--c-desktop);
-  background-image: var(--texture-desktop);
-  background-repeat: repeat;
+  background-image: var(--texture-desktop), var(--texture-desktop-imagery);
+  background-repeat: repeat, repeat;
 }
 
 /* ---- desktop icons ------------------------------------------------------- */
@@ -128,6 +132,18 @@ optgroup {
   gap: calc(var(--window-pad) / 2);
   padding: var(--window-pad);
   max-height: 100%;
+}
+
+/* Scattered layout is a "someone dumped the icons" look.
+   We still set the actual left/top per icon via style (deterministic RNG data),
+   but the decision to scatter lives in classes. */
+.icons--scattered {
+  display: block;
+  position: relative;
+}
+
+.icons--scattered .icon {
+  position: absolute;
 }
 
 .icon {
@@ -146,6 +162,7 @@ optgroup {
 .icon-face {
   display: grid;
   place-items: center;
+  position: relative;
   width: 44px;
   height: 44px;
   background-repeat: repeat;
@@ -160,6 +177,28 @@ optgroup {
   /* The generated tile behind can be any colour; a halo keeps the glyph
      readable without needing to know what it landed on. */
   text-shadow: 0 0 3px var(--c-surface), 0 0 6px var(--c-surface);
+  position: relative;
+  z-index: 1;
+}
+
+/* Lived-in icon residue (coffee ring / scuff / tape). Very faint so it
+   reads as wear rather than decoration. */
+.icon-face .icon-residue {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  width: 7px;
+  height: 7px;
+  border: 1px solid var(--c-line);
+  border-radius: 50%;
+  opacity: 0.18;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Worn icons get a tiny extra desk-used patina. */
+.icon-face.worn {
+  filter: saturate(0.94) brightness(0.985);
 }
 
 .icon-label {
@@ -188,6 +227,59 @@ optgroup {
 .icon.is-selected .icon-label {
   color: var(--c-accent-ink);
   background: var(--c-accent);
+}
+
+/* ---- desktop clutter (light lived-in residue) ----------------------------- */
+
+.desktop-clutter {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0; /* sits under icons layer */
+}
+
+.clutter-item {
+  position: absolute;
+  font-size: 10px;
+  line-height: 1;
+  opacity: 0.26;
+  color: var(--c-ink);
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.clutter-note {
+  font-family: var(--font-mono);
+  padding: 1px 5px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-line);
+  border-radius: 1px;
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.08);
+  opacity: 0.38;
+}
+
+.clutter-ring {
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--c-line);
+  border-radius: 50%;
+  opacity: 0.18;
+}
+
+.clutter-clip {
+  font-size: 13px;
+  opacity: 0.32;
+  transform: rotate(-8deg);
+}
+
+.clutter-smudge {
+  width: 19px;
+  height: 8px;
+  background: var(--c-line);
+  opacity: 0.11;
+  border-radius: 50%;
+  filter: blur(0.4px);
 }
 
 .window-layer {
@@ -619,6 +711,28 @@ body.is-patching .cable {
   color: var(--c-ink-muted);
 }
 
+/* Pushes the New folder / New note buttons to the right-hand end, so the path
+   stays left-aligned however long it is. */
+.files-spacer {
+  flex: 1 1 auto;
+}
+
+.files-tool {
+  flex: 0 0 auto;
+  height: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  font-size: var(--size-small);
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-control);
+  cursor: pointer;
+}
+
+.files-tool:hover {
+  background: var(--c-bevel-light);
+}
+
 .files-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -641,6 +755,35 @@ body.is-patching .cable {
 
 .files-row:hover {
   background: var(--c-surface-alt);
+}
+
+/*
+ * Selection, and the keyboard.
+ *
+ * Rows are divs rather than buttons because they hold a rename field and a
+ * context menu, so the font has to be inherited explicitly — a button gets that
+ * from the reset near the top of this file and a div does not.
+ *
+ * Focus is styled the same as selection because in this list they are the same
+ * thing: shell/files.ts moves the selection with the arrow keys and focuses the
+ * row it lands on, so showing them differently would draw two highlights for
+ * one cursor.
+ */
+.files-row {
+  font: inherit;
+  letter-spacing: inherit;
+}
+
+.files-row.is-selected,
+.files-row:focus {
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+  outline: none;
+}
+
+.files-row.is-selected .files-meta,
+.files-row:focus .files-meta {
+  color: var(--c-accent-ink);
 }
 
 .files-glyph {
@@ -1091,6 +1234,12 @@ body.is-patching .cable {
   font-weight: var(--weight-strong);
 }
 
+.weather-head {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .weather-now {
   font-family: var(--font-mono);
   color: var(--c-accent);
@@ -1135,6 +1284,20 @@ body.is-patching .cable {
   font-size: var(--size-small);
   font-style: italic;
   color: var(--c-ink-muted);
+}
+
+/* Lookup field in the controls bar. Matches the "search for a place" fiction
+   and reuses the same tokens as browser-address for visual consistency. */
+.weather-lookup {
+  flex: 0 1 9em;
+  min-width: 6em;
+  height: var(--control-height);
+  padding: 0 calc(var(--window-pad) / 2);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  background: var(--c-field);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
 }
 
 /* ---- browser ------------------------------------------------------------- */
@@ -1672,4 +1835,232 @@ body.is-patching .cable {
   letter-spacing: 0.12em;
   text-align: center;
   color: var(--c-ink-muted);
+}
+
+/* ---- popup menus --------------------------------------------------------- */
+
+/*
+ * Positioned by shell/menu.ts, which measures the panel and flips it at the
+ * screen edges, so the only rules here are appearance. `position: fixed`
+ * because menus are appended to <body> and must not be clipped by the window
+ * they belong to.
+ */
+.menu {
+  position: fixed;
+  z-index: 3000;
+  min-width: 11em;
+  padding: calc(var(--window-pad) / 4) 0;
+  background-color: var(--c-surface);
+  background-image: var(--texture-surface);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+  box-shadow: var(--shadow-window);
+  font-size: var(--size-ui);
+}
+
+.menu-item {
+  display: flex;
+  gap: var(--window-pad);
+  align-items: baseline;
+  padding: calc(var(--window-pad) / 3) var(--window-pad);
+  color: var(--c-ink);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* Hover and keyboard focus are one state on purpose: a menu driven by the
+   arrow keys should look exactly like a menu driven by the mouse. */
+.menu-item:hover,
+.menu-item:focus,
+.menu-item.is-open {
+  background: var(--c-accent);
+  color: var(--c-accent-ink);
+  outline: none;
+}
+
+.menu-item.is-disabled {
+  color: var(--c-ink-muted);
+  cursor: default;
+}
+
+/* Unreachable by keyboard and never hovered-highlighted, so it must not light
+   up under the pointer either. */
+.menu-item.is-disabled:hover {
+  background: transparent;
+  color: var(--c-ink-muted);
+}
+
+/* Fixed width, always present: labels line up whether or not an item has a
+   glyph, which is what stops a mixed menu looking ragged. */
+.menu-glyph {
+  flex: 0 0 auto;
+  width: 1.2em;
+  font-family: var(--font-mono);
+  text-align: center;
+}
+
+.menu-label {
+  flex: 1 1 auto;
+}
+
+/* Shortcuts and submenu arrows. Dimmed, and never the reason the row is wide. */
+.menu-hint {
+  flex: 0 0 auto;
+  padding-left: var(--window-pad);
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.menu-item:hover .menu-hint,
+.menu-item:focus .menu-hint,
+.menu-item.is-open .menu-hint {
+  color: var(--c-accent-ink);
+}
+
+.menu-separator {
+  height: 0;
+  margin: calc(var(--window-pad) / 4) 0;
+  border-top: var(--border-width) var(--border-style) var(--c-line);
+}
+/* ---- renaming in place --------------------------------------------------- */
+
+/*
+ * Sized to the row it replaces rather than to its content: shell/rename.ts
+ * hides the label instead of removing it, so the layout must not shift as the
+ * field appears. `min-width: 0` lets it shrink inside the flex row instead of
+ * pushing the metadata column off the end.
+ */
+.rename-field {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0 calc(var(--window-pad) / 4);
+  color: var(--c-ink);
+  background: var(--c-field);
+  border: var(--border-width) var(--border-style) var(--c-accent);
+  border-radius: var(--radius-control);
+}
+
+/* ---- file viewer --------------------------------------------------------- */
+
+.viewer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.viewer-head {
+  display: flex;
+  flex: 0 0 auto;
+  gap: var(--window-pad);
+  align-items: baseline;
+  justify-content: space-between;
+  padding: calc(var(--window-pad) / 2) var(--window-pad);
+  border-bottom: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.viewer-path {
+  overflow: hidden;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viewer-meta {
+  flex: 0 0 auto;
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.viewer-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  background: var(--c-field);
+}
+
+.viewer-stack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--window-pad) / 2);
+  padding: var(--window-pad);
+}
+
+/* Text and hex dumps. `pre-wrap` so a long line wraps rather than forcing the
+   whole window to scroll sideways. */
+.viewer-text {
+  margin: 0;
+  padding: var(--window-pad);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Stroke and fill are set here rather than on the element, so the plot follows
+   the machine's ink the same way every other mark on screen does. */
+.viewer-plot {
+  display: block;
+  width: 100%;
+  height: 7em;
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.viewer-plot polyline {
+  fill: none;
+  stroke: var(--c-accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.viewer-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(var(--window-pad) / 3);
+}
+
+.viewer-cell {
+  padding: 0 calc(var(--window-pad) / 3);
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  background: var(--c-surface-alt);
+  border: var(--border-width) var(--border-style) var(--c-line);
+  border-radius: var(--radius-control);
+}
+
+.viewer-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.viewer-row {
+  padding: calc(var(--window-pad) / 4) 0;
+  font-family: var(--font-mono);
+  font-size: var(--size-small);
+  border-bottom: var(--border-width) var(--border-style) var(--c-surface-alt);
+}
+
+.viewer-row-dim {
+  color: var(--c-ink-muted);
+}
+
+/* Nearest-neighbour: these are small generated images and smoothing them into
+   a blur would hide the very thing worth looking at. */
+.viewer-pixels {
+  display: block;
+  max-width: 100%;
+  image-rendering: pixelated;
+  border: var(--border-width) var(--border-style) var(--c-line);
+}
+
+.viewer-caption {
+  font-size: var(--size-small);
+  color: var(--c-ink-muted);
+}
+
+.viewer-empty {
+  padding: var(--window-pad);
+  color: var(--c-ink-muted);
+  font-style: italic;
 }
